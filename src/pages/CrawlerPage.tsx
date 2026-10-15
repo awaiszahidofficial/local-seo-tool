@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ISSUE_META, isIssueCode, sortIssues } from '../../supabase/functions/_shared/issues.ts'
 import { Icon } from '../components/icons'
+import { ProjectSelect } from '../components/ProjectSelect'
 import { Alert } from '../components/ui/Alert'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Card, CardHeader } from '../components/ui/Card'
@@ -170,33 +171,21 @@ export function CrawlerPage() {
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-end gap-4 p-5">
-          <div className="min-w-[16rem] flex-1">
-            <label htmlFor="crawl-project" className="mb-1 block text-sm font-medium text-slate-800">
-              Project
-            </label>
-            <select
-              id="crawl-project"
-              className={controlClasses(false)}
-              value={selected?.id ?? ''}
-              disabled={running}
-              onChange={(event) => {
-                setRunError(null)
-                setJustFinished(null)
-                setFilter('all')
-                const next = new URLSearchParams(searchParams)
-                if (event.target.value) next.set('project', event.target.value)
-                else next.delete('project')
-                setSearchParams(next, { replace: true })
-              }}
-            >
-              <option value="">Choose a project…</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} — {formatUrlForDisplay(project.website_url, 40)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ProjectSelect
+            id="crawl-project"
+            projects={projects}
+            value={selected?.id ?? ''}
+            disabled={running}
+            onChange={(projectId) => {
+              setRunError(null)
+              setJustFinished(null)
+              setFilter('all')
+              const next = new URLSearchParams(searchParams)
+              if (projectId) next.set('project', projectId)
+              else next.delete('project')
+              setSearchParams(next, { replace: true })
+            }}
+          />
           <Button onClick={() => void handleStart()} loading={running} disabled={!selected}>
             <Icon name="globe" className="size-4" />
             {running ? 'Crawling…' : crawl ? 'Crawl again' : 'Start crawl'}

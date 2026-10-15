@@ -1,3 +1,5 @@
+import type { SchemaLocal } from '../../supabase/functions/_shared/crawler.ts'
+
 /**
  * Manually maintained types mirroring supabase/migrations.
  * Keep in sync with the SQL schema (or replace with `supabase gen types typescript`).
@@ -76,6 +78,17 @@ export type CrawlPageRow = {
   issues: string[]
   error: string | null
   created_at: string
+  // Local signals (migration 20261017000000). local_version 0 = crawled before they existed.
+  h2s: string[]
+  body_text: string | null
+  phones: string[]
+  tel_links: number
+  schema_types: string[]
+  schema_local: SchemaLocal | null
+  has_map_embed: boolean
+  address_text: string | null
+  link_paths: string[]
+  local_version: number
 }
 
 export type Database = {

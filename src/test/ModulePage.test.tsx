@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { ModulePage } from '../pages/ModulePage'
-import { MODULE_IDS, MODULES } from '../lib/modules'
+import { MODULE_IDS, MODULES, getImplementedPath } from '../lib/modules'
 
 function renderAt(path: string) {
   render(
@@ -10,19 +10,29 @@ function renderAt(path: string) {
       <Routes>
         <Route path="/modules/:moduleId" element={<ModulePage />} />
         <Route path="/crawler" element={<h1>Crawler page</h1>} />
+        <Route path="/page-auditor" element={<h1>Auditor page</h1>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
-// The crawler graduated from placeholder to a real page in Phase 2.
-const PLACEHOLDER_IDS = MODULE_IDS.filter((id) => id !== 'crawler')
+// Built modules (Phase 2 crawler, Phase 3 auditor) have real pages; the rest are placeholders.
+const PLACEHOLDER_IDS = MODULE_IDS.filter((id) => getImplementedPath(id) === null)
 
 describe('ModulePage', () => {
-  it('redirects the retired crawler placeholder to the real crawler page', () => {
+  it('redirects retired placeholders of built modules to their real pages', () => {
     renderAt('/modules/crawler')
     expect(screen.getByRole('heading', { level: 1, name: 'Crawler page' })).toBeInTheDocument()
     expect(screen.queryByText('Not implemented in this phase')).not.toBeInTheDocument()
+  })
+
+  it('redirects the page-auditor placeholder to the auditor page', () => {
+    renderAt('/modules/page-auditor')
+    expect(screen.getByRole('heading', { level: 1, name: 'Auditor page' })).toBeInTheDocument()
+  })
+
+  it('keeps placeholders for every module that is not built yet', () => {
+    expect(PLACEHOLDER_IDS).toEqual(['service-area', 'gbp-audit', 'search-console', 'listings', 'keywords', 'recommendations', 'reports'])
   })
 
   it.each(PLACEHOLDER_IDS)('renders the %s placeholder with the correct name and a not-implemented notice', (id) => {

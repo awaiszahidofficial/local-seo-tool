@@ -6,6 +6,9 @@
  * project's own site, honour robots.txt, and bound pages, bytes and time.
  */
 import { analyzePage, findDuplicateIssues, sortIssues, type IssueCode } from './issues.ts'
+import { phoneKey } from './phone.ts'
+
+export { phoneKey }
 
 export const USER_AGENT = 'LocalSEOWorkbenchBot/1.0 (site audit requested by the site owner)'
 const ROBOTS_AGENT = 'localseoworkbenchbot'
@@ -234,21 +237,153 @@ function parseAttributes(tag: string): Record<string, string> {
   return attributes
 }
 
+/** Compact summary of the first LocalBusiness-type JSON-LD node on a page. */
+export type SchemaLocal = {
+  types: string[]
+  name: string | null
+  telephone: string | null
+  address: string | null
+  has_geo: boolean
+  has_hours: boolean
+  same_as_count: number
+  has_rating: boolean
+  url: string | null
+}
+
 export type PageExtract = {
   title: string | null
   metaDescription: string | null
   h1s: string[]
+  h2s: string[]
   canonicalUrl: string | null
   robotsMeta: string | null
   wordCount: number
+  /** Main-content text (navigation, header, footer and sidebars removed), capped at BODY_TEXT_MAX. */
+  bodyText: string
+  /** Phone numbers shown anywhere on the page (header and footer included), de-duplicated. */
+  phones: string[]
+  /** Number of distinct tel: links (click-to-call). */
+  telLinks: number
+  schemaTypes: string[]
+  schemaLocal: SchemaLocal | null
+  hasMapEmbed: boolean
+  addressText: string | null
   /** Followable same-or-other-site http(s) links, fragment removed, in document order. */
   links: URL[]
+}
+
+export const BODY_TEXT_MAX = 12_000
+/** Bump when the set of stored local signals changes so the UI can ask for a re-crawl. */
+export const LOCAL_SIGNALS_VERSION = 1
+
+const LOCAL_TYPE_NAMES = new Set([
+  'LocalBusiness', 'Plumber', 'Electrician', 'HVACBusiness', 'HomeAndConstructionBusiness', 'RoofingContractor',
+  'GeneralContractor', 'HousePainter', 'Locksmith', 'MovingCompany', 'ProfessionalService', 'LegalService',
+  'Attorney', 'Notary', 'Dentist', 'Physician', 'MedicalBusiness', 'MedicalClinic', 'Optician', 'Pharmacy',
+  'Restaurant', 'FoodEstablishment', 'CafeOrCoffeeShop', 'BarOrPub', 'Bakery', 'Store', 'AutoRepair', 'AutoDealer',
+  'AutomotiveBusiness', 'BeautySalon', 'HairSalon', 'DaySpa', 'HealthAndBeautyBusiness', 'RealEstateAgent',
+  'AccountingService', 'FinancialService', 'InsuranceAgency', 'Hotel', 'LodgingBusiness', 'ChildCare',
+  'DryCleaningOrLaundry', 'EmergencyService', 'TravelAgency', 'VeterinaryCare', 'SportsActivityLocation',
+  'ExerciseGym', 'SelfStorage', 'TouristInformationCenter',
+])
+
+function isLocalSchemaType(type: string): boolean {
+  return (
+    LOCAL_TYPE_NAMES.has(type) ||
+    /(Business|Contractor|Repair|Clinic|Salon|Dentist|Plumber|Electrician|Locksmith|Restaurant|Store)$/.test(type)
+  )
+}
+
+function asStrings(value: unknown): string[] {
+  const list = Array.isArray(value) ? value : [value]
+  return list
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.replace(/^https?:\/\/schema\.org\//i, '').trim())
+    .filter(Boolean)
+}
+
+function flattenJsonLd(value: unknown, out: Record<string, unknown>[], depth = 0): void {
+  if (depth > 4 || value === null || typeof value !== 'object') return
+  if (Array.isArray(value)) {
+    for (const item of value) flattenJsonLd(item, out, depth + 1)
+    return
+  }
+  const node = value as Record<string, unknown>
+  out.push(node)
+  if (node['@graph']) flattenJsonLd(node['@graph'], out, depth + 1)
+}
+
+function cap(value: unknown, max: number): string | null {
+  if (typeof value !== 'string') return null
+  const text = value.replace(/\s+/g, ' ').trim()
+  return text ? text.slice(0, max) : null
+}
+
+function formatSchemaAddress(address: unknown): string | null {
+  if (typeof address === 'string') return cap(address, 300)
+  if (address === null || typeof address !== 'object') return null
+  const record = address as Record<string, unknown>
+  const parts = ['streetAddress', 'addressLocality', 'addressRegion', 'postalCode', 'addressCountry']
+    .map((key) => (typeof record[key] === 'string' ? (record[key] as string).trim() : ''))
+    .filter(Boolean)
+  return parts.length > 0 ? parts.join(', ').slice(0, 300) : null
+}
+
+/** Reads JSON-LD blocks (before scripts are stripped) and summarises local-business markup. */
+export function extractSchema(html: string): { types: string[]; local: SchemaLocal | null } {
+  const nodes: Record<string, unknown>[] = []
+  const pattern = /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script\s*>/gi
+  for (const match of html.matchAll(pattern)) {
+    try {
+      flattenJsonLd(JSON.parse((match[1] ?? '').trim()), nodes)
+    } catch {
+      // ignore invalid JSON-LD blocks
+    }
+  }
+
+  const types = new Set<string>()
+  let local: SchemaLocal | null = null
+  for (const node of nodes) {
+    const nodeTypes = asStrings(node['@type'])
+    for (const type of nodeTypes) types.add(type.slice(0, 60))
+    if (local === null && nodeTypes.some(isLocalSchemaType)) {
+      const sameAs = node['sameAs']
+      local = {
+        types: nodeTypes.slice(0, 5).map((type) => type.slice(0, 60)),
+        name: cap(node['name'], 200),
+        telephone: cap(node['telephone'], 40),
+        address: formatSchemaAddress(node['address']),
+        has_geo: node['geo'] !== undefined && node['geo'] !== null,
+        has_hours: Boolean(node['openingHours'] ?? node['openingHoursSpecification']),
+        same_as_count: Array.isArray(sameAs) ? sameAs.length : typeof sameAs === 'string' ? 1 : 0,
+        has_rating: node['aggregateRating'] !== undefined && node['aggregateRating'] !== null,
+        url: cap(node['url'], 300),
+      }
+    }
+  }
+  return { types: [...types].slice(0, 20), local }
+}
+
+const PHONE_PATTERN = /(?<!\d)(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)[\s.-]?|\d{2,4}[\s.-])\d{3,4}[\s.-]?\d{3,4}(?!\d)/g
+
+export function extractPhones(text: string, telHrefs: readonly string[]): string[] {
+  const found = new Map<string, string>()
+  const add = (raw: string) => {
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length < 10 || digits.length > 15) return
+    const key = phoneKey(raw)
+    if (!found.has(key)) found.set(key, raw.replace(/\s+/g, ' ').trim().slice(0, 30))
+  }
+  for (const href of telHrefs) add(href)
+  for (const match of text.matchAll(PHONE_PATTERN)) add(match[0])
+  return [...found.values()].slice(0, 5)
 }
 
 const MAX_HTML_CHARS = 2_000_000
 
 export function extractPage(html: string, baseUrl: URL): PageExtract {
   const source = html.length > MAX_HTML_CHARS ? html.slice(0, MAX_HTML_CHARS) : html
+  const schema = extractSchema(source)
   const cleaned = source
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style|template|svg)\b[\s\S]*?<\/\1\s*>/gi, ' ')
@@ -280,23 +415,47 @@ export function extractPage(html: string, baseUrl: URL): PageExtract {
     }
   }
 
-  const h1s: string[] = []
-  for (const match of cleaned.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/gi)) {
-    const text = toText(match[1] ?? '')
-    if (text) h1s.push(text)
+  const headings = (level: 1 | 2, limit: number): string[] => {
+    const out: string[] = []
+    for (const match of cleaned.matchAll(new RegExp(`<h${level}\\b[^>]*>([\\s\\S]*?)<\\/h${level}\\s*>`, 'gi'))) {
+      const text = toText(match[1] ?? '')
+      if (text) out.push(level === 2 ? text.slice(0, 200) : text)
+      if (out.length >= limit) break
+    }
+    return out
   }
+  const h1s = headings(1, 50)
+  const h2s = headings(2, 10)
 
   const bodyStart = cleaned.search(/<body\b/i)
-  const body = (bodyStart === -1 ? cleaned : cleaned.slice(bodyStart))
-    .replace(/<(nav|header|footer|aside)\b[\s\S]*?<\/\1\s*>/gi, ' ')
-  const words = toText(body).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)
+  const wholeBody = bodyStart === -1 ? cleaned : cleaned.slice(bodyStart)
+  const mainBody = wholeBody.replace(/<(nav|header|footer|aside)\b[\s\S]*?<\/\1\s*>/gi, ' ')
+  const mainText = toText(mainBody)
+  const words = mainText.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)
   const wordCount = words ? words.length : 0
 
+  const addressMatch = /<address\b[^>]*>([\s\S]*?)<\/address\s*>/i.exec(wholeBody)
+  const addressText = addressMatch ? toText(addressMatch[1] ?? '').slice(0, 300) || null : null
+  const hasMapEmbed =
+    /<iframe\b[^>]*\bsrc\s*=\s*["'][^"']*(google\.[a-z.]+\/maps|maps\.google|maps\.app\.goo\.gl|openstreetmap\.org|bing\.com\/maps)/i.test(
+      wholeBody,
+    )
+
   const links: URL[] = []
+  const telHrefs: string[] = []
   for (const tag of cleaned.match(/<a\b[^>]*>/gi) ?? []) {
     const attributes = parseAttributes(tag)
     const href = attributes['href']?.trim()
-    if (!href || href.startsWith('#') || /^(mailto|tel|javascript|data|sms):/i.test(href)) continue
+    if (!href || href.startsWith('#')) continue
+    if (/^tel:/i.test(href)) {
+      try {
+        telHrefs.push(decodeURIComponent(href.replace(/^tel:/i, '')).trim())
+      } catch {
+        telHrefs.push(href.replace(/^tel:/i, '').trim())
+      }
+      continue
+    }
+    if (/^(mailto|javascript|data|sms):/i.test(href)) continue
     if (attributes['rel']?.toLowerCase().split(/\s+/).includes('nofollow')) continue
     try {
       const url = new URL(href, baseUrl)
@@ -308,7 +467,26 @@ export function extractPage(html: string, baseUrl: URL): PageExtract {
     }
   }
 
-  return { title, metaDescription, h1s, canonicalUrl, robotsMeta, wordCount, links }
+  const telKeys = new Set(telHrefs.map(phoneKey).filter((key) => key.length >= 7))
+  const phones = extractPhones(toText(wholeBody), telHrefs)
+
+  return {
+    title,
+    metaDescription,
+    h1s,
+    h2s,
+    canonicalUrl,
+    robotsMeta,
+    wordCount,
+    bodyText: mainText.slice(0, BODY_TEXT_MAX),
+    phones,
+    telLinks: telKeys.size,
+    schemaTypes: schema.types,
+    schemaLocal: schema.local,
+    hasMapEmbed,
+    addressText,
+    links,
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -331,6 +509,17 @@ export type CrawledPage = {
   depth: number
   issues: IssueCode[]
   error: string | null
+  // Local signals (Phase 3). `local_version` 0 marks rows written before these existed.
+  h2s: string[]
+  body_text: string | null
+  phones: string[]
+  tel_links: number
+  schema_types: string[]
+  schema_local: SchemaLocal | null
+  has_map_embed: boolean
+  address_text: string | null
+  link_paths: string[]
+  local_version: number
 }
 
 export type StopReason = 'completed' | 'page_limit' | 'time_limit' | 'blocked_by_robots'
@@ -466,6 +655,16 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       depth: item.depth,
       issues: [],
       error: null,
+      h2s: [],
+      body_text: null,
+      phones: [],
+      tel_links: 0,
+      schema_types: [],
+      schema_local: null,
+      has_map_embed: false,
+      address_text: null,
+      link_paths: [],
+      local_version: LOCAL_SIGNALS_VERSION,
     }
 
     try {
@@ -506,9 +705,23 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       base.word_count = extract.wordCount
       base.canonical_url = truncate(extract.canonicalUrl, 2048)
       base.robots_meta = truncate(extract.robotsMeta, 200)
+      base.h2s = extract.h2s
+      base.body_text = extract.bodyText
+      base.phones = extract.phones
+      base.tel_links = extract.telLinks
+      base.schema_types = extract.schemaTypes
+      base.schema_local = extract.schemaLocal
+      base.has_map_embed = extract.hasMapEmbed
+      base.address_text = extract.addressText
 
       const internal = extract.links.filter((link) => isSameSite(start, link))
-      base.internal_links_count = new Set(internal.map(normalizeForQueue)).size
+      const internalKeys = new Set(internal.map(normalizeForQueue))
+      base.internal_links_count = internalKeys.size
+      base.link_paths = [
+        ...new Set(
+          internal.map((link) => (link.pathname + link.search).slice(0, 200)),
+        ),
+      ].slice(0, 40)
       base.issues = analyzePage({
         statusCode: status,
         fetchFailed: false,

@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CrawlPageRow, CrawlRow, ProjectRow } from '../types/database'
+import type { CrawlRow, ProjectRow } from '../types/database'
+import { CRAWL_ID, PROJECT_ID, makeCrawl, makeCrawlPage, makeProject } from './crawlFixtures'
 
 const { listProjectsMock, startCrawlMock, getLatestCrawlMock, listCrawlPagesMock } = vi.hoisted(() => ({
   listProjectsMock: vi.fn(),
@@ -25,61 +26,9 @@ vi.mock('../lib/supabase', () => ({ supabase: {} }))
 
 import { CrawlerPage } from '../pages/CrawlerPage'
 
-const PROJECT_ID = '22222222-2222-4222-8222-222222222222'
-const CRAWL_ID = '33333333-3333-4333-8333-333333333333'
-
-const project: ProjectRow = {
-  id: PROJECT_ID,
-  user_id: '11111111-1111-4111-8111-111111111111',
-  name: 'Acme Plumbing',
-  website_url: 'https://acme.example',
-  business_name: null,
-  location: null,
-  business_type: null,
-  notes: null,
-  created_at: '2026-10-15T00:00:00Z',
-  updated_at: '2026-10-15T00:00:00Z',
-}
-
-const crawl: CrawlRow = {
-  id: CRAWL_ID,
-  project_id: PROJECT_ID,
-  user_id: project.user_id,
-  status: 'completed',
-  start_url: 'https://acme.example/',
-  pages_crawled: 2,
-  stopped_reason: 'page_limit',
-  error_message: null,
-  started_at: '2026-10-16T10:00:00Z',
-  finished_at: '2026-10-16T10:00:30Z',
-  created_at: '2026-10-16T10:00:00Z',
-}
-
-function page(overrides: Partial<CrawlPageRow>): CrawlPageRow {
-  return {
-    id: crypto.randomUUID(),
-    crawl_id: CRAWL_ID,
-    project_id: PROJECT_ID,
-    user_id: project.user_id,
-    url: 'https://acme.example/',
-    final_url: null,
-    status_code: 200,
-    title: 'Home | Acme Plumbing',
-    meta_description: null,
-    h1: 'Welcome',
-    h1_count: 1,
-    word_count: 420,
-    canonical_url: null,
-    robots_meta: null,
-    internal_links_count: 3,
-    response_time_ms: 200,
-    depth: 0,
-    issues: [],
-    error: null,
-    created_at: '2026-10-16T10:00:10Z',
-    ...overrides,
-  }
-}
+const project: ProjectRow = makeProject()
+const crawl: CrawlRow = makeCrawl({ stopped_reason: 'page_limit' })
+const page = makeCrawlPage
 
 const pages = [
   page({ issues: ['missing_meta_description'] }),

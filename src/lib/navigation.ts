@@ -1,5 +1,5 @@
 import type { IconName } from '../components/icons'
-import { MODULES, modulePath, type ModuleId } from './modules'
+import { MODULES, getImplementedPath, modulePath, type ModuleId } from './modules'
 
 export type NavItem = {
   label: string
@@ -49,12 +49,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: 'Analysis modules',
-    items: MODULE_ORDER.map((id) =>
-      id === 'crawler'
-        ? // Implemented in Phase 2: links to the real page instead of a placeholder.
-          { label: MODULES[id].name, to: '/crawler', icon: MODULE_ICONS[id], planned: false }
-        : { label: MODULES[id].name, to: modulePath(id), icon: MODULE_ICONS[id], planned: true },
-    ),
+    items: MODULE_ORDER.map((id) => {
+      const implementedPath = getImplementedPath(id)
+      return {
+        label: MODULES[id].name,
+        to: implementedPath ?? modulePath(id),
+        icon: MODULE_ICONS[id],
+        planned: implementedPath === null,
+      }
+    }),
   },
   {
     label: 'Account',

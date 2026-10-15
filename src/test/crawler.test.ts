@@ -474,3 +474,149 @@ describe('crawlSite', () => {
     expect(result.pages[0]?.status_code).toBe(200)
   })
 })
+
+describe('local signal extraction', () => {
+  const base = new URL('https://example.com/')
+
+  const jsonLd = (data: unknown) => `<script type="application/ld+json">${JSON.stringify(data)}</script>`
+
+  it('summarises LocalBusiness JSON-LD, including @graph and array types', () => {
+    const page = extractPage(
+      `<html><head>${jsonLd({
+        '@context': 'https://schema.org',
+        '@graph': [
+          { '@type': 'WebSite', name: 'Site' },
+          {
+            '@type': ['Plumber', 'LocalBusiness'],
+            name: 'Acme Plumbing',
+            telephone: '+1 512-555-0142',
+            url: 'https://acme.example',
+            address: { '@type': 'PostalAddress', streetAddress: '12 Main St', addressLocality: 'Austin', addressRegion: 'TX', postalCode: '78701' },
+            geo: { latitude: 1, longitude: 2 },
+            openingHours: 'Mo-Fr 08:00-17:00',
+            sameAs: ['https://facebook.com/acme', 'https://instagram.com/acme'],
+            aggregateRating: { ratingValue: 4.8 },
+          },
+        ],
+      })}</head><body><h1>Hi</h1></body></html>`,
+      base,
+    )
+    expect(page.schemaTypes).toEqual(expect.arrayContaining(['WebSite', 'Plumber', 'LocalBusiness']))
+    expect(page.schemaLocal).toEqual({
+      types: ['Plumber', 'LocalBusiness'],
+      name: 'Acme Plumbing',
+      telephone: '+1 512-555-0142',
+      address: '12 Main St, Austin, TX, 78701',
+      has_geo: true,
+      has_hours: true,
+      same_as_count: 2,
+      has_rating: true,
+      url: 'https://acme.example',
+    })
+  })
+
+  it('returns no local schema for non-local types, string addresses and invalid JSON', () => {
+    const nonLocal = extractPage(`<head>${jsonLd({ '@type': 'Organization', name: 'Acme' })}</head>`, base)
+    expect(nonLocal.schemaTypes).toEqual(['Organization'])
+    expect(nonLocal.schemaLocal).toBeNull()
+
+    const broken = extractPage('<head><script type="application/ld+json">{ not json</script></head>', base)
+    expect(broken.schemaTypes).toEqual([])
+    expect(broken.schemaLocal).toBeNull()
+
+    const stringAddress = extractPage(
+      `<head>${jsonLd({ '@type': 'Dentist', name: 'Smile', address: '5 Oak Ave, Dallas' })}</head>`,
+      base,
+    )
+    expect(stringAddress.schemaLocal?.address).toBe('5 Oak Ave, Dallas')
+    expect(stringAddress.schemaLocal?.telephone).toBeNull()
+  })
+
+  it('finds phone numbers in header/footer and tel: links, de-duplicated across formats', () => {
+    const page = extractPage(
+      `<body>
+        <header>Call (512) 555-0142 today</header>
+        <main><h1>Home</h1><p>Founded in 2026-10-16. Order 12345 ready.</p>
+          <a href="tel:+15125550142">Call</a><a href="tel:+1-512-555-0199">Other</a>
+        </main>
+        <footer>Phone: 512.555.0142</footer>
+      </body>`,
+      base,
+    )
+    expect(page.phones).toHaveLength(2)
+    expect(page.telLinks).toBe(2)
+    expect(page.phones.join(' ')).toMatch(/512/)
+  })
+
+  it('does not mistake dates, short numbers or prices for phone numbers', () => {
+    const page = extractPage('<body><p>Posted 2026-10-16. Price $1,234.50. Ref 123-45. Code 99999</p></body>', base)
+    expect(page.phones).toEqual([])
+    expect(page.telLinks).toBe(0)
+  })
+
+  it('excludes tel: links from crawlable links', () => {
+    const page = extractPage('<body><a href="tel:5125550142">x</a><a href="/a">y</a></body>', base)
+    expect(page.links.map((l) => l.pathname)).toEqual(['/a'])
+  })
+
+  it('captures h2s, address element, map embed and body text without nav/footer', () => {
+    const page = extractPage(
+      `<body>
+        <nav>Menu items</nav>
+        <h1>Plumber in Austin</h1>
+        <h2>Drain cleaning</h2><h2>Water heaters</h2>
+        <p>We serve Austin homeowners.</p>
+        <iframe src="https://www.google.com/maps/embed?pb=123"></iframe>
+        <footer><address>12 Main St<br>Austin, TX 78701</address></footer>
+      </body>`,
+      base,
+    )
+    expect(page.h2s).toEqual(['Drain cleaning', 'Water heaters'])
+    expect(page.hasMapEmbed).toBe(true)
+    expect(page.addressText).toBe('12 Main St Austin, TX 78701')
+    expect(page.bodyText).toContain('We serve Austin homeowners.')
+    expect(page.bodyText).not.toContain('Menu items')
+    expect(page.bodyText).not.toContain('78701')
+  })
+
+  it('caps stored body text', () => {
+    const page = extractPage(`<body><p>${'word '.repeat(10_000)}</p></body>`, base)
+    expect(page.bodyText.length).toBeLessThanOrEqual(12_000)
+    expect(page.wordCount).toBe(10_000)
+  })
+})
+
+describe('crawlSite stores local signals', () => {
+  it('records signals, internal link paths and the signals version on each page', async () => {
+    const body = `<html><head><title>${GOOD_TITLE}</title><meta name="description" content="${GOOD_DESC}">
+      <script type="application/ld+json">{"@type":"Plumber","name":"Acme","telephone":"512-555-0142"}</script></head>
+      <body><h1>Plumber in Austin</h1><h2>Services</h2><a href="tel:5125550142">Call</a>
+      <a href="/contact">Contact</a><a href="/services/drains?x=1">Drains</a><a href="https://other.com/">Out</a>
+      <p>${'word '.repeat(350)}</p></body></html>`
+    const result = await crawlSite({
+      startUrl: new URL('https://example.com/'),
+      fetcher: makeFetcher({ 'https://example.com/': { body } }),
+      limits: { maxPages: 1 },
+    })
+    const page = result.pages[0]
+    expect(page?.local_version).toBe(1)
+    expect(page?.schema_local?.name).toBe('Acme')
+    expect(page?.phones).toHaveLength(1)
+    expect(page?.tel_links).toBe(1)
+    expect(page?.h2s).toEqual(['Services'])
+    expect(page?.link_paths).toEqual(['/contact', '/services/drains?x=1'])
+    expect(page?.body_text).toContain('Plumber in Austin')
+  })
+
+  it('gives failed pages empty signals', async () => {
+    const result = await crawlSite({
+      startUrl: new URL('https://example.com/'),
+      fetcher: makeFetcher({ 'https://example.com/': { status: 500, body: 'x' } }),
+    })
+    const page = result.pages[0]
+    expect(page?.phones).toEqual([])
+    expect(page?.schema_local).toBeNull()
+    expect(page?.body_text).toBeNull()
+    expect(page?.link_paths).toEqual([])
+  })
+})

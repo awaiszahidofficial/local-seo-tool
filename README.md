@@ -2,7 +2,7 @@
 
 Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local business owners who manage local SEO work across several client websites. The long-term goal is to audit sites, analyse Google Business Profiles, find local ranking opportunities, monitor Search Console data, track listings and generate reports.
 
-**This repository contains Phase 1 (application foundation) and Phase 2 (Website Crawler).** Auth, project management and the crawler are real and working; the other SEO analysis modules are still planned.
+**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler) and Phase 3 (Local Page Auditor).** Auth, project management, the crawler and the auditor are real and working; the other SEO analysis modules are still planned.
 
 ## What Phase 1 implements
 
@@ -49,9 +49,34 @@ If you see "The crawler service is not available yet", the function is not deplo
 - A DNS-rebinding attacker could in theory change a hostname's address between the safety check and the fetch; the function also validates every redirect and re-checks DNS per request.
 - The crawl runs while the page is open (up to about 90 s); it is not a background job yet.
 
+## What Phase 3 adds: Local Page Auditor
+
+The auditor reads the latest crawl of a project and checks the pages that matter for local search. It runs in the browser from stored crawl data (no extra server), so results update instantly when you edit a project's location or business type.
+
+It classifies each page (home, contact, service, location, about, blog) from its URL, then runs checks that fit that type: location in title, H1, meta description and content; business name in title; service keyword; phone number visible and click-to-call; LocalBusiness structured data; address; map on the contact page; link to the contact page; content depth (500+ words); subheadings; noindex. Site-wide it checks for a home page, contact page and service pages, one consistent phone number, and that the structured data's name, phone and address agree with the pages and the project. The page shows a summary, a ranked "what to work on first" list, site-wide checks, and page-by-page results with plain-language fixes.
+
+It uses the project's **business name, location and business type**; set them on the project for the best results. A location like `Austin, TX` is matched on the city. If no business name is set, the project name is used. The project has no phone or address fields, so the "correct" phone number is whatever the site shows; the auditor flags when pages disagree with each other or with the structured data.
+
+### Upgrade steps for Phase 3
+
+The crawler now stores extra signals (structured data, phone numbers, headings, page text, link paths), so after pulling this version:
+
+1. **Apply the third migration** in the Supabase SQL Editor: `supabase/migrations/20261017000000_local_signals.sql` (after the first two).
+2. **Redeploy the Edge Function** so it collects the new signals: `npx supabase functions deploy crawl-site`
+3. **Crawl each project again.** Crawls made before this version have no local signals; the auditor tells you to crawl again. The function also now keeps only the 5 newest crawls per project.
+4. Open **Local Page Auditor** and choose the project.
+
+### Auditor limitations
+
+- Checks are best-practice guidelines based on page HTML as served (no JavaScript rendering); they are not a ranking guarantee.
+- Page text is stored up to 12,000 characters per page, so mention counts on very long pages cover only the first part.
+- Page types are guessed from URLs; unusual URL structures may be classified as "other".
+- Phone numbers are detected from text and `tel:` links with a pattern that may miss unusual formats or pick up number-like text. Addresses are detected only from an `<address>` element or structured data.
+- Review markup, opening hours, Google Business Profile consistency and citations are not checked yet (later modules).
+
 ## Still planned (not implemented)
 
-Local Page Auditor, Service-Area Coverage, Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No crawling, Google integration, AI or reporting exists in this phase.
+Service-Area Coverage, Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No Google integration, AI recommendations or reporting exist yet.
 
 ## Prerequisites
 
@@ -141,5 +166,5 @@ git push -u origin main
 - "Missing configuration" screen: `.env.local` is absent or misnamed; restart `npm run dev` after editing it.
 - Reset link opens but shows an error: the link expired or the redirect URL is not in Supabase's allow-list.
 - Project list errors with "permission denied": the migration was not applied, or its grants were changed.
-- Only the Website Crawler is built; no Google integrations, AI recommendations or reports exist yet.
+- Only the Website Crawler and Local Page Auditor are built; no Google integrations, AI recommendations or reports exist yet.
 - **The crawler's Edge Function and the second migration were typechecked (Deno) and its logic unit-tested with a mock network, but never run against a live Supabase project or a real website in the build environment.** Run one crawl on a site you own and check the results.

@@ -4,15 +4,16 @@ import { ButtonLink } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { PageHeader } from '../components/ui/PageHeader'
-import { getModule } from '../lib/modules'
+import { getImplementedPath, getModule } from '../lib/modules'
 
 /** Resolves `/modules/:moduleId` against the static module map; unknown ids get a safe fallback. */
 export function ModulePage() {
   const { moduleId } = useParams()
   const module = getModule(moduleId)
 
-  // The crawler is implemented (Phase 2); keep old /modules/crawler links working.
-  if (module?.id === 'crawler') return <Navigate to="/crawler" replace />
+  // Built modules have their own page; keep old /modules/<id> links working.
+  const implementedPath = module ? getImplementedPath(module.id) : null
+  if (implementedPath) return <Navigate to={implementedPath} replace />
 
   if (!module) {
     return (

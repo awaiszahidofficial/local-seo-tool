@@ -126,3 +126,16 @@ export function getModule(id: string | undefined): ModuleMeta | null {
 export function modulePath(id: ModuleId): string {
   return `/modules/${id}`
 }
+
+/**
+ * Modules that have been built. Each has its own page, so the `/modules/:id` placeholder route
+ * redirects to it and the sidebar shows it as available rather than planned.
+ */
+export const IMPLEMENTED_MODULE_PATHS: Readonly<Partial<Record<ModuleId, string>>> = {
+  crawler: '/crawler',
+  'page-auditor': '/page-auditor',
+}
+
+export function getImplementedPath(id: ModuleId): string | null {
+  return IMPLEMENTED_MODULE_PATHS[id] ?? null
+}

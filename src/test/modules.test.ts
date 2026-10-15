@@ -52,10 +52,10 @@ describe('sidebar navigation', () => {
     ])
   })
 
-  it('marks every module except the implemented crawler as planned and links each to a known module', () => {
+  it('marks every module except the built ones (crawler, auditor) as planned and links each to a known module', () => {
     const items = NAV_GROUPS.flatMap((group) => group.items)
     const planned = items.filter((item) => item.planned)
-    expect(planned).toHaveLength(Object.keys(MODULES).length - 1)
+    expect(planned).toHaveLength(Object.keys(MODULES).length - 2)
     for (const item of planned) {
       expect(item.to.startsWith('/modules/')).toBe(true)
       expect(isModuleId(item.to.replace('/modules/', ''))).toBe(true)
@@ -64,8 +64,10 @@ describe('sidebar navigation', () => {
       'Overview',
       'Projects',
       'Website Crawler',
+      'Local Page Auditor',
       'Settings',
     ])
     expect(items.find((item) => item.label === 'Website Crawler')).toMatchObject({ to: '/crawler', planned: false })
+    expect(items.find((item) => item.label === 'Local Page Auditor')).toMatchObject({ to: '/page-auditor', planned: false })
   })
 })

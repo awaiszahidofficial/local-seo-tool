@@ -20,6 +20,8 @@ const CORS_HEADERS = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** A crawl row still "running" newer than this blocks a second crawl of the same project. */
 const RUNNING_GUARD_MS = 3 * 60 * 1000
+/** Crawls kept per project; older ones (and their pages) are deleted after each successful crawl. */
+const CRAWLS_TO_KEEP = 5
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -130,6 +132,21 @@ Deno.serve(async (req: Request) => {
         finished_at: new Date().toISOString(),
       })
       .eq('id', crawl.id)
+
+    // Housekeeping: keep only the newest crawls for this project. Failure here must not fail the crawl.
+    try {
+      const { data: old } = await admin
+        .from('crawls')
+        .select('id')
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false })
+        .range(CRAWLS_TO_KEEP, CRAWLS_TO_KEEP + 200)
+      if (old && old.length > 0) {
+        await admin.from('crawls').delete().in('id', old.map((row: { id: string }) => row.id))
+      }
+    } catch {
+      // ignore
+    }
 
     return json({ crawlId: crawl.id, status: 'completed', pagesCrawled: result.pages.length })
   } catch (error) {
