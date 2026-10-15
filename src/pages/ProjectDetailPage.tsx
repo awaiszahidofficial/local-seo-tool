@@ -72,6 +72,10 @@ export function ProjectDetailPage() {
         description={project.business_name ?? undefined}
         actions={
           <>
+            <ButtonLink to={`/crawler?project=${project.id}`} variant="secondary">
+              <Icon name="globe" className="size-4" />
+              Crawl website
+            </ButtonLink>
             <ButtonLink to={`/projects/${project.id}/edit`} variant="secondary">
               <Icon name="pencil" className="size-4" />
               Edit

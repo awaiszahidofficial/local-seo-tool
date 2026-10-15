@@ -1,0 +1,393 @@
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ISSUE_META, isIssueCode, sortIssues } from '../../supabase/functions/_shared/issues.ts'
+import { Icon } from '../components/icons'
+import { Alert } from '../components/ui/Alert'
+import { Button, ButtonLink } from '../components/ui/Button'
+import { Card, CardHeader } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
+import { PageHeader } from '../components/ui/PageHeader'
+import { LoadingState } from '../components/ui/Spinner'
+import { StatusBadge, type BadgeTone } from '../components/ui/StatusBadge'
+import { Table, Td, Th } from '../components/ui/Table'
+import { controlClasses } from '../components/ui/fieldStyles'
+import { useLatestCrawl } from '../hooks/useLatestCrawl'
+import { useProjectList } from '../hooks/useProjectList'
+import { describeStopReason, filterPages, startCrawl, summarizeCrawl, type IssueFilter } from '../lib/crawls'
+import { formatDateTime } from '../lib/format'
+import { formatUrlForDisplay, getSafeHttpUrl } from '../lib/url'
+import type { CrawlPageRow } from '../types/database'
+
+const SEVERITY_TONE: Record<'error' | 'warning' | 'info', BadgeTone> = {
+  error: 'danger',
+  warning: 'warning',
+  info: 'neutral',
+}
+
+const FILTER_LABELS: Record<IssueFilter, string> = {
+  all: 'All pages',
+  errors: 'Pages with errors',
+  warnings: 'Pages with warnings only',
+  clean: 'No errors or warnings',
+}
+
+function IssueBadges({ issues }: { issues: string[] }) {
+  const sorted = sortIssues(issues)
+  if (sorted.length === 0) return <span className="text-slate-500">No issues</span>
+  return (
+    <ul className="flex flex-wrap gap-1">
+      {sorted.map((code) => (
+        <li key={code}>
+          <StatusBadge tone={SEVERITY_TONE[ISSUE_META[code].severity]}>{ISSUE_META[code].label}</StatusBadge>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function statusTone(code: number | null): BadgeTone {
+  if (code === null || code >= 400) return 'danger'
+  if (code >= 300) return 'warning'
+  return 'success'
+}
+
+function PageRow({ page, startUrl }: { page: CrawlPageRow; startUrl: string }) {
+  const href = getSafeHttpUrl(page.url)
+  return (
+    <tr>
+      <Td className="max-w-xs">
+        {href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-indigo-700 hover:underline">
+            {formatUrlForDisplay(page.url, 60)}
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        ) : (
+          <span className="break-all">{page.url}</span>
+        )}
+        {page.url === startUrl ? <span className="ml-2 text-xs text-slate-500">(start page)</span> : null}
+        {page.final_url ? (
+          <p className="mt-0.5 text-xs break-all text-slate-500">Redirects to {formatUrlForDisplay(page.final_url, 60)}</p>
+        ) : null}
+      </Td>
+      <Td>
+        {page.status_code === null ? (
+          <StatusBadge tone="danger">Failed</StatusBadge>
+        ) : (
+          <StatusBadge tone={statusTone(page.status_code)}>{String(page.status_code)}</StatusBadge>
+        )}
+      </Td>
+      <Td className="max-w-xs">
+        {page.title ?? <span className="text-slate-500">{page.error ?? 'Missing'}</span>}
+      </Td>
+      <Td className="max-w-[14rem]">{page.h1 ?? <span className="text-slate-500">—</span>}</Td>
+      <Td className="text-right tabular-nums">{page.error ? '—' : page.word_count}</Td>
+      <Td>
+        <IssueBadges issues={page.issues} />
+      </Td>
+    </tr>
+  )
+}
+
+export function CrawlerPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const projectsState = useProjectList()
+  const requestedId = searchParams.get('project')
+  const projects = projectsState.projects
+  const selected = projects?.find((project) => project.id === requestedId) ?? null
+  const crawlState = useLatestCrawl(selected?.id ?? null)
+
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  const [justFinished, setJustFinished] = useState<number | null>(null)
+  const [filter, setFilter] = useState<IssueFilter>('all')
+
+  const summary = useMemo(() => summarizeCrawl(crawlState.pages), [crawlState.pages])
+  const visiblePages = useMemo(() => filterPages(crawlState.pages, filter), [crawlState.pages, filter])
+
+  async function handleStart() {
+    if (!selected || running) return
+    setRunning(true)
+    setRunError(null)
+    setJustFinished(null)
+    const result = await startCrawl(selected.id)
+    setRunning(false)
+    if (result.data === null) {
+      setRunError(result.error)
+      return
+    }
+    setJustFinished(result.data.pagesCrawled)
+    setFilter('all')
+    crawlState.reload()
+  }
+
+  const header = (
+    <PageHeader
+      title="Website Crawler"
+      description="Crawl a project’s website to list its pages and find on-page issues: missing titles, meta descriptions and headings, duplicate titles, thin content and broken pages."
+    />
+  )
+
+  if (projectsState.loading) {
+    return (
+      <>
+        {header}
+        <LoadingState label="Loading your projects…" />
+      </>
+    )
+  }
+  if (projectsState.error) {
+    return (
+      <>
+        {header}
+        <Alert variant="error" title="Could not load your projects">
+          {projectsState.error}
+        </Alert>
+      </>
+    )
+  }
+  if (!projects || projects.length === 0) {
+    return (
+      <>
+        {header}
+        <Card>
+          <EmptyState
+            icon="globe"
+            title="Create a project to crawl its website"
+            description="The crawler works on the website address saved in a project."
+            action={<ButtonLink to="/projects/new">New project</ButtonLink>}
+          />
+        </Card>
+      </>
+    )
+  }
+
+  const crawl = crawlState.crawl
+  const stopNote = crawl ? describeStopReason(crawl.stopped_reason) : null
+
+  return (
+    <>
+      {header}
+
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-end gap-4 p-5">
+          <div className="min-w-[16rem] flex-1">
+            <label htmlFor="crawl-project" className="mb-1 block text-sm font-medium text-slate-800">
+              Project
+            </label>
+            <select
+              id="crawl-project"
+              className={controlClasses(false)}
+              value={selected?.id ?? ''}
+              disabled={running}
+              onChange={(event) => {
+                setRunError(null)
+                setJustFinished(null)
+                setFilter('all')
+                const next = new URLSearchParams(searchParams)
+                if (event.target.value) next.set('project', event.target.value)
+                else next.delete('project')
+                setSearchParams(next, { replace: true })
+              }}
+            >
+              <option value="">Choose a project…</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name} — {formatUrlForDisplay(project.website_url, 40)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button onClick={() => void handleStart()} loading={running} disabled={!selected}>
+            <Icon name="globe" className="size-4" />
+            {running ? 'Crawling…' : crawl ? 'Crawl again' : 'Start crawl'}
+          </Button>
+        </div>
+        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+          Crawls up to 25 pages of this one website, follows links on the same site only, and respects robots.txt.
+          A crawl can take up to 90 seconds.
+        </p>
+      </Card>
+
+      {running ? (
+        <Alert variant="info" className="mb-6" title="Crawl in progress">
+          Fetching pages from {selected ? formatUrlForDisplay(selected.website_url, 60) : 'the site'}. Keep this page
+          open until it finishes.
+        </Alert>
+      ) : null}
+      {runError ? (
+        <Alert variant="error" className="mb-6" title="The crawl did not complete">
+          {runError}
+        </Alert>
+      ) : null}
+      {justFinished !== null && !runError ? (
+        <Alert variant="success" className="mb-6">
+          Crawl finished: {justFinished} {justFinished === 1 ? 'page' : 'pages'} checked.
+        </Alert>
+      ) : null}
+
+      {!selected ? (
+        <Card>
+          <EmptyState
+            icon="globe"
+            title="Choose a project"
+            description="Pick a project above, then start a crawl to see its pages and issues."
+          />
+        </Card>
+      ) : crawlState.loading ? (
+        <LoadingState label="Loading crawl results…" />
+      ) : crawlState.error ? (
+        <Alert variant="error" title="Could not load crawl results">
+          {crawlState.error}{' '}
+          {crawlState.error.includes('migration') ? null : (
+            <>
+              If this is a new setup, make sure the <code>20261016000000_crawls.sql</code> migration has been applied.
+            </>
+          )}
+        </Alert>
+      ) : !crawl ? (
+        <Card>
+          <EmptyState
+            icon="globe"
+            title="This website has not been crawled yet"
+            description="Start a crawl to list the site’s pages and check each one for common on-page SEO problems."
+          />
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          <Card as="section" aria-labelledby="crawl-summary">
+            <CardHeader
+              id="crawl-summary"
+              title="Latest crawl"
+              description={`${formatDateTime(crawl.started_at)} · ${formatUrlForDisplay(crawl.start_url, 60)}`}
+              action={
+                <StatusBadge
+                  tone={crawl.status === 'completed' ? 'success' : crawl.status === 'failed' ? 'danger' : 'warning'}
+                >
+                  {crawl.status === 'completed' ? 'Completed' : crawl.status === 'failed' ? 'Failed' : 'Running'}
+                </StatusBadge>
+              }
+            />
+            {crawl.status === 'failed' ? (
+              <div className="p-5">
+                <Alert variant="error" title="This crawl failed">
+                  {crawl.error_message ?? 'Something went wrong. Try crawling again.'}
+                </Alert>
+              </div>
+            ) : crawl.status === 'running' ? (
+              <div className="p-5">
+                <Alert variant="info">
+                  This crawl is still marked as running. Reload in a minute; if it never finishes, start a new crawl.
+                </Alert>
+              </div>
+            ) : (
+              <>
+                <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+                  {[
+                    ['Pages crawled', summary.totalPages],
+                    ['Pages with errors', summary.pagesWithErrors],
+                    ['Pages with warnings', summary.pagesWithWarnings],
+                    ['No errors or warnings', summary.cleanPages],
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-white px-5 py-4">
+                      <dt className="text-xs font-medium text-slate-600">{label}</dt>
+                      <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {stopNote ? (
+                  <div className="p-5 pb-0">
+                    <Alert variant="warning">{stopNote}</Alert>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </Card>
+
+          {crawl.status === 'completed' && summary.issueCounts.length > 0 ? (
+            <Card as="section" aria-labelledby="issue-breakdown">
+              <CardHeader id="issue-breakdown" title="Issues found" description="Counted by number of pages affected." />
+              <ul className="divide-y divide-slate-100">
+                {summary.issueCounts.map((entry) => (
+                  <li key={entry.code} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
+                    <span className="flex items-center gap-3">
+                      <StatusBadge tone={SEVERITY_TONE[entry.severity]}>
+                        {entry.severity === 'error' ? 'Error' : entry.severity === 'warning' ? 'Warning' : 'Notice'}
+                      </StatusBadge>
+                      <span className="text-slate-800">{isIssueCode(entry.code) ? ISSUE_META[entry.code].label : entry.code}</span>
+                    </span>
+                    <span className="font-medium text-slate-900 tabular-nums">
+                      {entry.count} {entry.count === 1 ? 'page' : 'pages'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
+          {crawl.status === 'completed' ? (
+            <Card as="section" aria-labelledby="crawl-pages">
+              <CardHeader
+                id="crawl-pages"
+                title="Pages"
+                action={
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="page-filter" className="sr-only">
+                      Filter pages
+                    </label>
+                    <select
+                      id="page-filter"
+                      className={controlClasses(false)}
+                      value={filter}
+                      onChange={(event) => setFilter(event.target.value as IssueFilter)}
+                    >
+                      {(Object.keys(FILTER_LABELS) as IssueFilter[]).map((value) => (
+                        <option key={value} value={value}>
+                          {FILTER_LABELS[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                }
+              />
+              {crawlState.pages.length === 0 ? (
+                <EmptyState
+                  icon="alert"
+                  title="No pages were recorded"
+                  description={stopNote ?? 'The crawl finished without finding any pages to record.'}
+                />
+              ) : visiblePages.length === 0 ? (
+                <p className="px-5 py-8 text-center text-sm text-slate-600">No pages match this filter.</p>
+              ) : (
+                <Table aria-label="Crawled pages">
+                  <thead>
+                    <tr>
+                      <Th>Page</Th>
+                      <Th>Status</Th>
+                      <Th>Title</Th>
+                      <Th>H1</Th>
+                      <Th className="text-right">Words</Th>
+                      <Th>Issues</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visiblePages.map((page) => (
+                      <PageRow key={page.id} page={page} startUrl={crawl.start_url} />
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card>
+          ) : null}
+
+          <p className="text-xs text-slate-500">
+            Results describe the pages as fetched without running JavaScript. Pages that depend on scripts to show
+            their content may look thinner here than in a browser.{' '}
+            <Link to={`/projects/${selected.id}`} className="font-medium text-indigo-700 hover:underline">
+              View project
+            </Link>
+          </p>
+        </div>
+      )}
+    </>
+  )
+}

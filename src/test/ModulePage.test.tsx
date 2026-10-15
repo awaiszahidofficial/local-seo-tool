@@ -9,13 +9,23 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/modules/:moduleId" element={<ModulePage />} />
+        <Route path="/crawler" element={<h1>Crawler page</h1>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
+// The crawler graduated from placeholder to a real page in Phase 2.
+const PLACEHOLDER_IDS = MODULE_IDS.filter((id) => id !== 'crawler')
+
 describe('ModulePage', () => {
-  it.each(MODULE_IDS)('renders the %s placeholder with the correct name and a not-implemented notice', (id) => {
+  it('redirects the retired crawler placeholder to the real crawler page', () => {
+    renderAt('/modules/crawler')
+    expect(screen.getByRole('heading', { level: 1, name: 'Crawler page' })).toBeInTheDocument()
+    expect(screen.queryByText('Not implemented in this phase')).not.toBeInTheDocument()
+  })
+
+  it.each(PLACEHOLDER_IDS)('renders the %s placeholder with the correct name and a not-implemented notice', (id) => {
     renderAt(`/modules/${id}`)
     expect(screen.getByRole('heading', { level: 1, name: MODULES[id].name })).toBeInTheDocument()
     expect(screen.getByText('Planned')).toBeInTheDocument()
@@ -25,7 +35,7 @@ describe('ModulePage', () => {
   })
 
   it('does not render any action buttons for planned modules', () => {
-    renderAt('/modules/crawler')
+    renderAt('/modules/reports')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 

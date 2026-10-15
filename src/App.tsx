@@ -3,6 +3,7 @@ import { AppLayout } from './components/AppLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { PublicOnlyRoute } from './components/PublicOnlyRoute'
 import { AuthProvider } from './contexts/AuthProvider'
+import { CrawlerPage } from './pages/CrawlerPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { SignInPage } from './pages/auth/SignInPage'
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="projects/new" element={<ProjectNewPage />} />
               <Route path="projects/:projectId" element={<ProjectDetailPage />} />
               <Route path="projects/:projectId/edit" element={<ProjectEditPage />} />
+              <Route path="crawler" element={<CrawlerPage />} />
               <Route path="modules/:moduleId" element={<ModulePage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

@@ -22,3 +22,22 @@ export function formatDate(
     timeZone: options.timeZone,
   }).format(date)
 }
+
+/** Formats an ISO timestamp as e.g. "Oct 15, 2026, 3:30 PM". Returns "—" for missing or invalid input. */
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  options: FormatDateOptions = {},
+): string {
+  if (value === null || value === undefined || value === '') return EMPTY_VALUE
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return EMPTY_VALUE
+
+  return new Intl.DateTimeFormat(options.locale ?? 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: options.timeZone,
+  }).format(date)
+}

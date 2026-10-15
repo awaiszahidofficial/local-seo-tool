@@ -2,7 +2,7 @@
 
 Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local business owners who manage local SEO work across several client websites. The long-term goal is to audit sites, analyse Google Business Profiles, find local ranking opportunities, monitor Search Console data, track listings and generate reports.
 
-**This repository is Phase 1: the application foundation.** It is a real, working app (auth + project management on Supabase), but none of the SEO analysis modules exist yet.
+**This repository contains Phase 1 (application foundation) and Phase 2 (Website Crawler).** Auth, project management and the crawler are real and working; the other SEO analysis modules are still planned.
 
 ## What Phase 1 implements
 
@@ -11,14 +11,47 @@ Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local 
 - **Project management** (create, list, view, edit, delete with confirmation) backed by Supabase, with inline validation and URL normalisation (http/https only)
 - Overview dashboard showing real project data, or an honest empty state for new accounts (no fake metrics)
 - Responsive SaaS layout: persistent desktop sidebar, mobile/tablet drawer navigation, accessible forms and feedback
-- Placeholder pages for planned modules, clearly marked "not implemented in this phase"
+- Placeholder pages for the not-yet-built modules, clearly marked "not implemented in this phase"
 - SQL migration with `profiles` and `projects` tables, constraints, indexes, `updated_at` triggers, a hardened signup trigger and Row Level Security
 - Validation utilities (project form, URL, email, password, dates, URL display, env vars) with unit and component tests
 - Vercel SPA rewrites and a GitHub Actions CI workflow
 
-## Planned (not implemented)
+## What Phase 2 adds: Website Crawler
 
-Website Crawler, Local Page Auditor, Service-Area Coverage, Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No crawling, Google integration, AI or reporting exists in this phase.
+Pick a project, click **Start crawl**, and the app fetches up to 25 pages of that site (same site only, following internal links, honouring `robots.txt`) and shows, per page: HTTP status, title, H1, word count and a list of on-page issues, plus a summary and issue breakdown. Checks: failed or 4xx/5xx pages, missing/short/long/duplicate titles, missing/short/long/duplicate meta descriptions, missing or multiple H1, thin content (under 300 words), `noindex`, missing canonical, slow responses (over 3 s).
+
+It works by calling a Supabase **Edge Function** (`supabase/functions/crawl-site`) because browsers cannot fetch other websites. The function verifies the signed-in user and that the project is theirs, crawls, and saves results with the service role (the key never leaves Supabase). Users can read and delete their own crawl data but cannot write it, so results cannot be forged from the browser.
+
+Safety limits: public http(s) addresses only (localhost, private networks and IPv6 literals are refused, redirects are re-checked, DNS answers are checked), 25 pages, 1 MB per page, 8 s per request, 90 s total, one running crawl per project.
+
+### Set up Phase 2 (two extra steps)
+
+1. **Apply the second migration.** In Supabase SQL Editor, paste and run `supabase/migrations/20261016000000_crawls.sql` (after the first migration).
+2. **Deploy the Edge Function** (needs the Supabase CLI, run via `npx`, no install). In the project folder:
+
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <your-project-ref>
+   npx supabase functions deploy crawl-site
+   ```
+
+   The project ref is the ID in Project Settings → General (the part before `.supabase.co`). `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided to the function automatically; you do not set them. No change is needed in Vercel, and redeploying the website is not required for the function.
+
+3. Open **Website Crawler**, choose a project and start a crawl.
+
+If you see "The crawler service is not available yet", the function is not deployed to this Supabase project. If you see "Could not load crawl results", the second migration has not been applied.
+
+### Crawler limitations
+
+- HTML is read as the server sends it. JavaScript-rendered pages (some page builders) may look thin or empty.
+- HTML parsing is lightweight (no browser DOM), so unusual markup can be missed.
+- Not checked yet: broken external links, images, structured data, sitemaps, mobile or speed scores.
+- A DNS-rebinding attacker could in theory change a hostname's address between the safety check and the fetch; the function also validates every redirect and re-checks DNS per request.
+- The crawl runs while the page is open (up to about 90 s); it is not a background job yet.
+
+## Still planned (not implemented)
+
+Local Page Auditor, Service-Area Coverage, Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No crawling, Google integration, AI or reporting exists in this phase.
 
 ## Prerequisites
 
@@ -36,7 +69,7 @@ npm install
 
 1. Create a project at supabase.com.
 2. **Apply the migration** (pick one):
-   - *Dashboard:* open **SQL Editor**, paste the contents of `supabase/migrations/20261015000000_init_profiles_and_projects.sql`, and run it once.
+   - *Dashboard:* open **SQL Editor**, paste the contents of `supabase/migrations/20261015000000_init_profiles_and_projects.sql`, and run it once. (Phase 2 adds a second migration; see below.)
    - *CLI:* `npx supabase login`, `npx supabase link --project-ref <ref>`, then `npx supabase db push`.
 3. **Auth settings** (Authentication → URL Configuration): set *Site URL* to `http://localhost:5173` for local work, and add these to *Redirect URLs*:
    - `http://localhost:5173/reset-password`
@@ -108,4 +141,5 @@ git push -u origin main
 - "Missing configuration" screen: `.env.local` is absent or misnamed; restart `npm run dev` after editing it.
 - Reset link opens but shows an error: the link expired or the redirect URL is not in Supabase's allow-list.
 - Project list errors with "permission denied": the migration was not applied, or its grants were changed.
-- Phase 1 has no server-side code, so nothing can crawl sites or call Google APIs yet.
+- Only the Website Crawler is built; no Google integrations, AI recommendations or reports exist yet.
+- **The crawler's Edge Function and the second migration were typechecked (Deno) and its logic unit-tested with a mock network, but never run against a live Supabase project or a real website in the build environment.** Run one crawl on a site you own and check the results.

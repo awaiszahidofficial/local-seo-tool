@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { ModulePlaceholder } from '../components/ModulePlaceholder'
 import { ButtonLink } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -10,6 +10,9 @@ import { getModule } from '../lib/modules'
 export function ModulePage() {
   const { moduleId } = useParams()
   const module = getModule(moduleId)
+
+  // The crawler is implemented (Phase 2); keep old /modules/crawler links working.
+  if (module?.id === 'crawler') return <Navigate to="/crawler" replace />
 
   if (!module) {
     return (

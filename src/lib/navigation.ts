@@ -49,12 +49,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: 'Analysis modules',
-    items: MODULE_ORDER.map((id) => ({
-      label: MODULES[id].name,
-      to: modulePath(id),
-      icon: MODULE_ICONS[id],
-      planned: true,
-    })),
+    items: MODULE_ORDER.map((id) =>
+      id === 'crawler'
+        ? // Implemented in Phase 2: links to the real page instead of a placeholder.
+          { label: MODULES[id].name, to: '/crawler', icon: MODULE_ICONS[id], planned: false }
+        : { label: MODULES[id].name, to: modulePath(id), icon: MODULE_ICONS[id], planned: true },
+    ),
   },
   {
     label: 'Account',
