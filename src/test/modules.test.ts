@@ -52,10 +52,10 @@ describe('sidebar navigation', () => {
     ])
   })
 
-  it('marks every module except the built ones (crawler, auditor, service areas) as planned and links each to a known module', () => {
+  it('marks every module except the built ones (crawler, auditor, service areas, GBP audit) as planned and links each to a known module', () => {
     const items = NAV_GROUPS.flatMap((group) => group.items)
     const planned = items.filter((item) => item.planned)
-    expect(planned).toHaveLength(Object.keys(MODULES).length - 3)
+    expect(planned).toHaveLength(Object.keys(MODULES).length - 4)
     for (const item of planned) {
       expect(item.to.startsWith('/modules/')).toBe(true)
       expect(isModuleId(item.to.replace('/modules/', ''))).toBe(true)
@@ -66,10 +66,12 @@ describe('sidebar navigation', () => {
       'Website Crawler',
       'Local Page Auditor',
       'Service-Area Coverage',
+      'Google Business Profile Audit',
       'Settings',
     ])
     expect(items.find((item) => item.label === 'Website Crawler')).toMatchObject({ to: '/crawler', planned: false })
     expect(items.find((item) => item.label === 'Local Page Auditor')).toMatchObject({ to: '/page-auditor', planned: false })
     expect(items.find((item) => item.label === 'Service-Area Coverage')).toMatchObject({ to: '/service-area', planned: false })
+    expect(items.find((item) => item.label === 'Google Business Profile Audit')).toMatchObject({ to: '/gbp-audit', planned: false })
   })
 })

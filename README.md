@@ -2,7 +2,7 @@
 
 Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local business owners who manage local SEO work across several client websites. The long-term goal is to audit sites, analyse Google Business Profiles, find local ranking opportunities, monitor Search Console data, track listings and generate reports.
 
-**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor) and Phase 4 (Service-Area Coverage).** Auth, project management, the crawler, the auditor and service-area coverage are real and working; the other SEO analysis modules are still planned.
+**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor), Phase 4 (Service-Area Coverage) and Phase 5 (Google Business Profile Audit).** Auth, project management, the crawler, the auditor, service-area coverage and the Business Profile audit are real and working; the other SEO analysis modules are still planned.
 
 ## What Phase 1 implements
 
@@ -110,9 +110,28 @@ Without a saved list the project's primary location is used; without services, t
 - Internal links are counted from the first 40 links stored per page, so "nothing links to it" can be a false alarm on link-heavy sites.
 - Duplicate detection compares page text as stored (up to 12,000 characters of main content per page).
 
+## What Phase 5 adds: Google Business Profile Audit
+
+Enter a client's Google Business Profile details by hand (no Google connection needed): verification, name, categories, services, products, phone, website, address or service areas, hours, description, photos, reviews, reply rate, latest post and attributes. Anything left empty counts as "not entered" and is listed to fill in, not failed.
+
+The audit scores the profile out of 100 and lists what to fix first. Checks include: verification; keyword stuffing in the business name; primary category matching the business type; additional categories (max 9); services listed versus the project's services; website link pointing at the project's own domain; address, or service areas (max 20) covering the project's service areas; description length (750 max), location, services and no links or phone numbers; photos, logo and cover; review count, rating, reviews in the last 90 days and owner reply rate; post recency. With a crawl, it also compares the profile's phone, name and street address with the website.
+
+Google removed Q&A from Business Profiles, so it is not part of the audit.
+
+### Set up Phase 5
+
+1. **Apply the sixth migration** in the Supabase SQL Editor: `supabase/migrations/20261020000000_gbp_profiles.sql` (new `gbp_profiles` table, one row per project, owner-only RLS).
+2. Push to GitHub so Vercel redeploys. No Edge Function change is needed.
+3. Open **Google Business Profile Audit**, choose a project, click **Start from project details**, fill in the rest from the profile and click **Save and audit**.
+
+### GBP audit limitations
+
+- Data is entered by hand, so the audit is only as current as the last update. Thresholds (for example 25 reviews, 10 photos, a post every 30 days) are general guidelines; strong local competition may need more.
+- Name, phone and address comparisons with the website use the latest crawl (phone numbers, structured data and `<address>` text); addresses are compared on street number and street name.
+
 ## Still planned (not implemented)
 
-Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No Google integration, AI recommendations or reporting exist yet.
+Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No Google integration, AI recommendations or reporting exist yet.
 
 ## Prerequisites
 

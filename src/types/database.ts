@@ -96,6 +96,41 @@ export type CrawlPageRow = {
   local_version: number
 }
 
+/** Google Business Profile details entered for a project (migration 20261020000000). */
+export type GbpProfileRow = {
+  project_id: string
+  user_id: string
+  verified: boolean | null
+  business_name: string | null
+  primary_category: string | null
+  additional_categories: string[]
+  phone: string | null
+  website_url: string | null
+  address: string | null
+  service_area_business: boolean
+  gbp_service_areas: string[]
+  has_hours: boolean | null
+  has_special_hours: boolean | null
+  description: string | null
+  services: string[]
+  products_count: number | null
+  photos_count: number | null
+  has_logo: boolean | null
+  has_cover_photo: boolean | null
+  review_count: number | null
+  rating: number | null
+  reviews_last_90_days: number | null
+  reply_rate: number | null
+  last_post_date: string | null
+  attributes_count: number | null
+  has_booking_link: boolean | null
+  created_at: string
+  updated_at: string
+}
+
+/** Everything the user can write (ids and timestamps are set by the database). */
+export type GbpProfileInput = Omit<GbpProfileRow, 'user_id' | 'created_at' | 'updated_at'>
+
 export type Database = {
   public: {
     Tables: {
@@ -133,6 +168,12 @@ export type Database = {
         Row: CrawlPageRow
         Insert: never
         Update: never
+        Relationships: []
+      }
+      gbp_profiles: {
+        Row: GbpProfileRow
+        Insert: GbpProfileInput & { user_id?: string }
+        Update: Partial<GbpProfileInput>
         Relationships: []
       }
     }
