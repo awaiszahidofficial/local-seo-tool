@@ -14,7 +14,7 @@ type ProjectSelectProps = {
 export function ProjectSelect({ id, projects, value, disabled, onChange }: ProjectSelectProps) {
   return (
     <div className="min-w-[16rem] flex-1">
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-800">
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-ink">
         Project
       </label>
       <select

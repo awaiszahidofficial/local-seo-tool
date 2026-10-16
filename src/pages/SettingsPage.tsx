@@ -13,14 +13,14 @@ export function SettingsPage() {
 
       <Card as="section" aria-labelledby="account-details" className="max-w-3xl">
         <CardHeader id="account-details" title="Account" />
-        <dl className="divide-y divide-slate-100">
+        <dl className="divide-y divide-line-soft">
           <div className="px-5 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-            <dt className="text-sm font-medium text-slate-600">Email</dt>
-            <dd className="mt-1 text-sm break-all text-slate-900 sm:col-span-2 sm:mt-0">{user?.email ?? '—'}</dd>
+            <dt className="text-sm font-medium text-ink-2">Email</dt>
+            <dd className="mt-1 text-sm break-all text-ink sm:col-span-2 sm:mt-0">{user?.email ?? '—'}</dd>
           </div>
           <div className="px-5 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-            <dt className="text-sm font-medium text-slate-600">Member since</dt>
-            <dd className="mt-1 text-sm text-slate-900 sm:col-span-2 sm:mt-0">{formatDate(user?.created_at)}</dd>
+            <dt className="text-sm font-medium text-ink-2">Member since</dt>
+            <dd className="mt-1 text-sm text-ink sm:col-span-2 sm:mt-0">{formatDate(user?.created_at)}</dd>
           </div>
         </dl>
       </Card>

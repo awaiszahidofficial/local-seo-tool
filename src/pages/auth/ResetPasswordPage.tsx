@@ -87,12 +87,12 @@ export function ResetPasswordPage() {
           <button
             type="button"
             onClick={() => void handleCancel()}
-            className="font-medium text-indigo-700 hover:underline"
+            className="font-medium text-accent-ink hover:underline"
           >
             Cancel and sign out
           </button>
         ) : (
-          <Link to="/" className="font-medium text-indigo-700 hover:underline">
+          <Link to="/" className="font-medium text-accent-ink hover:underline">
             Back to the app
           </Link>
         )

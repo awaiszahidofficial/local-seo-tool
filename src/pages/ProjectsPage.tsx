@@ -25,7 +25,7 @@ function WebsiteLink({ url }: { url: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 break-all text-indigo-700 hover:underline"
+      className="inline-flex items-center gap-1 break-all text-accent-ink hover:underline"
     >
       {label}
       <Icon name="external" className="size-3.5 shrink-0" />
@@ -140,16 +140,16 @@ export function ProjectsPage() {
               </thead>
               <tbody>
                 {projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-slate-50">
+                  <tr key={project.id} className="hover:bg-surface-2">
                     <Td>
                       <Link
                         to={`/projects/${project.id}`}
-                        className="font-medium text-slate-900 hover:text-indigo-700 hover:underline"
+                        className="font-medium text-ink hover:text-accent-ink hover:underline"
                       >
                         {project.name}
                       </Link>
                       {project.business_name ? (
-                        <p className="text-slate-600">{project.business_name}</p>
+                        <p className="text-ink-2">{project.business_name}</p>
                       ) : null}
                     </Td>
                     <Td>
@@ -173,24 +173,24 @@ export function ProjectsPage() {
                 <Card className="p-4">
                   <Link
                     to={`/projects/${project.id}`}
-                    className="font-medium text-slate-900 hover:text-indigo-700 hover:underline"
+                    className="font-medium text-ink hover:text-accent-ink hover:underline"
                   >
                     {project.name}
                   </Link>
-                  {project.business_name ? <p className="text-sm text-slate-600">{project.business_name}</p> : null}
+                  {project.business_name ? <p className="text-sm text-ink-2">{project.business_name}</p> : null}
                   <dl className="mt-3 space-y-1 text-sm">
                     <div className="flex gap-2">
-                      <dt className="w-20 shrink-0 text-slate-500">Website</dt>
+                      <dt className="w-20 shrink-0 text-ink-3">Website</dt>
                       <dd className="min-w-0">
                         <WebsiteLink url={project.website_url} />
                       </dd>
                     </div>
                     <div className="flex gap-2">
-                      <dt className="w-20 shrink-0 text-slate-500">Location</dt>
+                      <dt className="w-20 shrink-0 text-ink-3">Location</dt>
                       <dd>{project.location ?? '—'}</dd>
                     </div>
                     <div className="flex gap-2">
-                      <dt className="w-20 shrink-0 text-slate-500">Created</dt>
+                      <dt className="w-20 shrink-0 text-ink-3">Created</dt>
                       <dd>{formatDate(project.created_at)}</dd>
                     </div>
                   </dl>
@@ -214,7 +214,7 @@ export function ProjectsPage() {
         onCancel={cancelDelete}
       >
         <p>
-          <strong className="font-semibold text-slate-900">{pendingDelete?.name}</strong> will be permanently
+          <strong className="font-semibold text-ink">{pendingDelete?.name}</strong> will be permanently
           deleted. This cannot be undone.
         </p>
       </ConfirmDialog>

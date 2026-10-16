@@ -41,15 +41,15 @@ const STATUS_BADGE: Record<CheckStatus, { tone: BadgeTone; label: string }> = {
 
 function CheckList({ checks, label }: { checks: readonly AuditCheck[]; label: string }) {
   return (
-    <ul aria-label={label} className="divide-y divide-slate-100">
+    <ul aria-label={label} className="divide-y divide-line-soft">
       {checks.map((check) => (
         <li key={check.id} className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-start sm:gap-4">
           <span className="w-20 shrink-0">
             <StatusBadge tone={STATUS_BADGE[check.status].tone}>{STATUS_BADGE[check.status].label}</StatusBadge>
           </span>
           <div className="min-w-0 text-sm">
-            <p className="font-medium text-slate-900">{check.label}</p>
-            <p className="mt-0.5 break-words text-slate-600">{check.detail}</p>
+            <p className="font-medium text-ink">{check.label}</p>
+            <p className="mt-0.5 break-words text-ink-2">{check.detail}</p>
           </div>
         </li>
       ))}
@@ -68,19 +68,19 @@ function PageSummary({ audit }: { audit: PageAudit }) {
 function PageAuditItem({ audit }: { audit: PageAudit }) {
   const tone: BadgeTone = audit.failed > 0 ? 'danger' : audit.warnings > 0 ? 'warning' : 'success'
   return (
-    <li className="border-b border-slate-100 last:border-b-0">
+    <li className="border-b border-line-soft last:border-b-0">
       <details className="group">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-indigo-600">
-          <Icon name="arrowLeft" className="size-4 shrink-0 -rotate-90 text-slate-500 transition-transform group-open:rotate-90" />
-          <span className="min-w-0 flex-1 break-all font-medium text-slate-900">{formatUrlForDisplay(audit.url, 70)}</span>
+        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
+          <Icon name="arrowLeft" className="size-4 shrink-0 -rotate-90 text-ink-3 transition-transform group-open:rotate-90" />
+          <span className="min-w-0 flex-1 break-all font-medium text-ink">{formatUrlForDisplay(audit.url, 70)}</span>
           <StatusBadge tone="neutral">{PAGE_TYPE_LABELS[audit.type]}</StatusBadge>
           <StatusBadge tone={tone}>{audit.checks.length === 0 ? 'No local checks' : `${audit.passed} of ${audit.checks.length} passed`}</StatusBadge>
-          <span className="text-xs text-slate-600">
+          <span className="text-xs text-ink-2">
             <PageSummary audit={audit} />
           </span>
         </summary>
         {audit.checks.length === 0 ? (
-          <p className="px-5 pb-4 text-sm text-slate-600">
+          <p className="px-5 pb-4 text-sm text-ink-2">
             No local checks apply to this type of page. The auditor focuses on home, contact, service and location pages.
           </p>
         ) : (
@@ -181,7 +181,7 @@ export function LocalAuditorPage() {
             </ButtonLink>
           ) : null}
         </div>
-        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+        <p className="border-t border-line-soft px-5 py-3 text-xs text-ink-2">
           The audit runs on the most recent crawl of the project, so crawl the site first and again after making changes.
         </p>
       </Card>
@@ -249,7 +249,7 @@ export function LocalAuditorPage() {
               title="Audit summary"
               description={`Based on the crawl from ${formatDateTime(crawl.started_at)} of ${formatUrlForDisplay(crawl.start_url, 60)}`}
             />
-            <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-px bg-subtle sm:grid-cols-4">
               {(
                 [
                   ['Pages audited', audit.pages.length],
@@ -258,14 +258,14 @@ export function LocalAuditorPage() {
                   ['To fix', audit.totals.failed],
                 ] as const
               ).map(([label, value]) => (
-                <div key={label} className="bg-white px-5 py-4">
-                  <dt className="text-xs font-medium text-slate-600">{label}</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+                <div key={label} className="bg-surface px-5 py-4">
+                  <dt className="text-xs font-medium text-ink-2">{label}</dt>
+                  <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{value}</dd>
                 </div>
               ))}
             </dl>
             {audit.skippedPages > 0 ? (
-              <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+              <p className="border-t border-line-soft px-5 py-3 text-xs text-ink-2">
                 {audit.skippedPages} crawled {audit.skippedPages === 1 ? 'page was' : 'pages were'} not audited because they failed to load or redirected.
               </p>
             ) : null}
@@ -274,14 +274,14 @@ export function LocalAuditorPage() {
           {audit.topFixes.length > 0 ? (
             <Card as="section" aria-labelledby="top-fixes">
               <CardHeader id="top-fixes" title="What to work on first" description="Problems ranked by severity, then by how many pages they affect." />
-              <ol className="divide-y divide-slate-100">
+              <ol className="divide-y divide-line-soft">
                 {audit.topFixes.slice(0, 8).map((fix) => (
                   <li key={fix.id} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
                     <span className="flex items-center gap-3">
                       <StatusBadge tone={fix.status === 'fail' ? 'danger' : 'warning'}>{fix.status === 'fail' ? 'Fix' : 'Improve'}</StatusBadge>
-                      <span className="text-slate-800">{fix.label}</span>
+                      <span className="text-ink">{fix.label}</span>
                     </span>
-                    <span className="shrink-0 text-slate-700 tabular-nums">
+                    <span className="shrink-0 text-ink-2 tabular-nums">
                       {fix.pages} {fix.pages === 1 ? 'page' : 'pages'}
                     </span>
                   </li>
@@ -323,7 +323,7 @@ export function LocalAuditorPage() {
               }
             />
             {visiblePages.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-slate-600">No pages match this filter.</p>
+              <p className="px-5 py-8 text-center text-sm text-ink-2">No pages match this filter.</p>
             ) : (
               <ul aria-label="Audited pages">
                 {visiblePages.map((page) => (
@@ -333,7 +333,7 @@ export function LocalAuditorPage() {
             )}
           </Card>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-3">
             Checks read each page as served without running JavaScript, and use the first 12,000 characters of
             each page’s main content. They are best-practice guidelines, not a ranking guarantee. Phone numbers are detected from page
             text and tel: links; address detection relies on an &lt;address&gt; element or structured data.

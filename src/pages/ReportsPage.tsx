@@ -165,14 +165,14 @@ export function ReportsPage() {
             ) : !rows || rows.length === 0 ? (
               <EmptyState icon="report" title="No reports yet" description="Create the first one above." />
             ) : (
-              <ul className="divide-y divide-slate-100" aria-label="Saved reports">
+              <ul className="divide-y divide-line-soft" aria-label="Saved reports">
                 {rows.map((report) => (
                   <li key={report.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
                     <div className="min-w-0 flex-1">
-                      <Link to={`/reports/${report.id}`} className="font-medium text-indigo-700 hover:underline">
+                      <Link to={`/reports/${report.id}`} className="font-medium text-accent-ink hover:underline">
                         {report.title}
                       </Link>
-                      <p className="text-xs text-slate-500">{formatDateTime(report.created_at)}</p>
+                      <p className="text-xs text-ink-3">{formatDateTime(report.created_at)}</p>
                     </div>
                     <Button
                       variant="ghost"
@@ -203,7 +203,7 @@ export function ReportsPage() {
         onCancel={() => setPendingDelete(null)}
       >
         <p>
-          <strong className="font-semibold text-slate-900">{pendingDelete?.title}</strong> will be permanently deleted.
+          <strong className="font-semibold text-ink">{pendingDelete?.title}</strong> will be permanently deleted.
         </p>
       </ConfirmDialog>
     </>

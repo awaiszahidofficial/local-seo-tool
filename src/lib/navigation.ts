@@ -8,6 +8,8 @@ export type NavItem = {
   /** True for modules that are not implemented in the current phase. */
   planned: boolean
   end?: boolean
+  /** True for module pages that act on the currently selected project. */
+  projectScoped?: boolean
 }
 
 export type NavGroup = {
@@ -27,17 +29,24 @@ const MODULE_ICONS: Record<ModuleId, IconName> = {
   reports: 'report',
 }
 
-const MODULE_ORDER: readonly ModuleId[] = [
-  'crawler',
-  'page-auditor',
-  'service-area',
-  'gbp-audit',
-  'search-console',
-  'listings',
-  'keywords',
-  'recommendations',
-  'reports',
+/** Modules grouped by the job they do for a local business. */
+const MODULE_GROUPS: readonly { label: string; ids: readonly ModuleId[] }[] = [
+  { label: 'Website', ids: ['crawler', 'page-auditor', 'service-area'] },
+  { label: 'Local presence', ids: ['gbp-audit', 'listings'] },
+  { label: 'Search', ids: ['search-console', 'keywords'] },
+  { label: 'Deliver', ids: ['recommendations', 'reports'] },
 ]
+
+function moduleItem(id: ModuleId): NavItem {
+  const implementedPath = getImplementedPath(id)
+  return {
+    label: MODULES[id].name,
+    to: implementedPath ?? modulePath(id),
+    icon: MODULE_ICONS[id],
+    planned: implementedPath === null,
+    projectScoped: true,
+  }
+}
 
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -47,20 +56,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { label: 'Projects', to: '/projects', icon: 'folder', planned: false },
     ],
   },
-  {
-    label: 'Analysis modules',
-    items: MODULE_ORDER.map((id) => {
-      const implementedPath = getImplementedPath(id)
-      return {
-        label: MODULES[id].name,
-        to: implementedPath ?? modulePath(id),
-        icon: MODULE_ICONS[id],
-        planned: implementedPath === null,
-      }
-    }),
-  },
+  ...MODULE_GROUPS.map((group) => ({ label: group.label, items: group.ids.map(moduleItem) })),
   {
     label: 'Account',
     items: [{ label: 'Settings', to: '/settings', icon: 'settings', planned: false }],
   },
 ]
+
+/** Paths of pages that work on one project chosen with ?project=<id>. */
+export const PROJECT_SCOPED_PATHS: ReadonlySet<string> = new Set(
+  NAV_GROUPS.flatMap((group) => group.items.filter((item) => item.projectScoped).map((item) => item.to)),
+)

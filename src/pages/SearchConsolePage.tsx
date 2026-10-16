@@ -13,8 +13,10 @@ import { controlClasses } from '../components/ui/fieldStyles'
 import { useFlashNotice } from '../hooks/useFlashNotice'
 import { useProjectList } from '../hooks/useProjectList'
 import { formatDate } from '../lib/format'
+import { TrendChart } from '../components/TrendChart'
 import {
   compareTotals,
+  dailySeries,
   isLocalQuery,
   localTerms,
   lowCtr,
@@ -55,11 +57,11 @@ function signed(value: number, digits = 0): string {
 }
 
 function Change({ value, suffix = '', digits = 0, invert = false }: { value: number | null; suffix?: string; digits?: number; invert?: boolean }) {
-  if (value === null) return <span className="text-slate-500">new</span>
-  if (value === 0) return <span className="text-slate-500">no change</span>
+  if (value === null) return <span className="text-ink-3">new</span>
+  if (value === 0) return <span className="text-ink-3">no change</span>
   const good = invert ? value < 0 : value > 0
   return (
-    <span className={good ? 'text-emerald-700' : 'text-red-700'}>
+    <span className={good ? 'text-good' : 'text-bad'}>
       {signed(value, digits)}
       {suffix}
     </span>
@@ -120,7 +122,7 @@ function ConnectButton({ returnTo, label = 'Connect Google Search Console' }: { 
 
 function QueryTable({ rows, label, firstColumn, limit, showChange = true }: { rows: readonly RowChange[]; label: string; firstColumn: string; limit: number; showChange?: boolean }) {
   const [expanded, setExpanded] = useState(false)
-  if (rows.length === 0) return <p className="px-5 py-6 text-center text-sm text-slate-600">No data for this period.</p>
+  if (rows.length === 0) return <p className="px-5 py-6 text-center text-sm text-ink-2">No data for this period.</p>
   const visible = expanded ? rows : rows.slice(0, limit)
   const isPage = firstColumn === 'Page'
   return (
@@ -143,12 +145,12 @@ function QueryTable({ rows, label, firstColumn, limit, showChange = true }: { ro
               <tr key={row.key}>
                 <Td className="max-w-sm break-words">
                   {href ? (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-indigo-700 hover:underline">
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-accent-ink hover:underline">
                       {formatUrlForDisplay(row.key, 60)}
                       <span className="sr-only"> (opens in a new tab)</span>
                     </a>
                   ) : (
-                    row.key || <span className="text-slate-500">(not shown by Google)</span>
+                    row.key || <span className="text-ink-3">(not shown by Google)</span>
                   )}
                 </Td>
                 <Td className="text-right tabular-nums">{integer.format(row.clicks)}</Td>
@@ -173,7 +175,7 @@ function QueryTable({ rows, label, firstColumn, limit, showChange = true }: { ro
         </tbody>
       </Table>
       {rows.length > limit ? (
-        <div className="border-t border-slate-100 px-5 py-3">
+        <div className="border-t border-line-soft px-5 py-3">
           <Button variant="secondary" onClick={() => setExpanded((value) => !value)}>
             {expanded ? 'Show fewer' : `Show all ${integer.format(rows.length)}`}
           </Button>
@@ -213,7 +215,7 @@ function PropertyPicker({ project, sites, onSaved }: { project: ProjectRow; site
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[16rem] flex-1">
-          <label htmlFor="gsc-property" className="mb-1 block text-sm font-medium text-slate-800">
+          <label htmlFor="gsc-property" className="mb-1 block text-sm font-medium text-ink">
             Search Console property for {project.name}
           </label>
           <select id="gsc-property" className={controlClasses(false)} value={value} onChange={(event) => setValue(event.target.value)}>
@@ -251,6 +253,11 @@ function PerformanceReport({ project, data }: { project: ProjectRow; data: GscPe
   const striking = useMemo(() => strikingDistance(queries), [queries])
   const weakCtr = useMemo(() => lowCtr(queries), [queries])
   const movers = useMemo(() => topMovers(queries), [queries])
+  const [metric, setMetric] = useState<'clicks' | 'impressions'>('clicks')
+  const { current: rangeNow, previous: rangeBefore } = data.ranges
+  const daily = data.daily
+  const dailyNow = useMemo(() => (daily ? dailySeries(rangeNow, daily.current) : null), [daily, rangeNow])
+  const dailyBefore = useMemo(() => (daily ? dailySeries(rangeBefore, daily.previous) : []), [daily, rangeBefore])
 
   return (
     <div className="space-y-6">
@@ -260,36 +267,67 @@ function PerformanceReport({ project, data }: { project: ProjectRow; data: GscPe
           title="Search performance"
           description={`${formatDate(data.ranges.current.startDate, { timeZone: 'UTC' })} – ${formatDate(data.ranges.current.endDate, { timeZone: 'UTC' })}, compared with the ${formatDate(data.ranges.previous.startDate, { timeZone: 'UTC' })} – ${formatDate(data.ranges.previous.endDate, { timeZone: 'UTC' })} period before it. Property: ${data.property}`}
         />
-        <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
-          <div className="bg-white px-5 py-4">
-            <dt className="text-xs font-medium text-slate-600">Clicks</dt>
-            <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{integer.format(totals.current.clicks)}</dd>
+        <dl className="grid grid-cols-2 gap-px bg-subtle sm:grid-cols-4">
+          <div className="bg-surface px-5 py-4">
+            <dt className="text-xs font-medium text-ink-2">Clicks</dt>
+            <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{integer.format(totals.current.clicks)}</dd>
             <dd className="text-xs tabular-nums">
               <Change value={totals.clicksPct} suffix="%" digits={1} />
             </dd>
           </div>
-          <div className="bg-white px-5 py-4">
-            <dt className="text-xs font-medium text-slate-600">Impressions</dt>
-            <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{integer.format(totals.current.impressions)}</dd>
+          <div className="bg-surface px-5 py-4">
+            <dt className="text-xs font-medium text-ink-2">Impressions</dt>
+            <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{integer.format(totals.current.impressions)}</dd>
             <dd className="text-xs tabular-nums">
               <Change value={totals.impressionsPct} suffix="%" digits={1} />
             </dd>
           </div>
-          <div className="bg-white px-5 py-4">
-            <dt className="text-xs font-medium text-slate-600">Average CTR</dt>
-            <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{formatPct(totals.current.ctr)}</dd>
+          <div className="bg-surface px-5 py-4">
+            <dt className="text-xs font-medium text-ink-2">Average CTR</dt>
+            <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{formatPct(totals.current.ctr)}</dd>
             <dd className="text-xs tabular-nums">
               <Change value={totals.ctrPoints} suffix=" pts" digits={1} />
             </dd>
           </div>
-          <div className="bg-white px-5 py-4">
-            <dt className="text-xs font-medium text-slate-600">Average position</dt>
-            <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{totals.current.position ? totals.current.position.toFixed(1) : '—'}</dd>
+          <div className="bg-surface px-5 py-4">
+            <dt className="text-xs font-medium text-ink-2">Average position</dt>
+            <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{totals.current.position ? totals.current.position.toFixed(1) : '—'}</dd>
             <dd className="text-xs tabular-nums">
               <Change value={totals.positionChange} digits={1} />
             </dd>
           </div>
         </dl>
+      </Card>
+
+      <Card as="section" aria-labelledby="gsc-trend">
+        <CardHeader
+          id="gsc-trend"
+          title="Daily trend"
+          action={
+            <div role="group" aria-label="Metric" className="flex rounded-lg border border-line p-0.5 text-xs">
+              {(['clicks', 'impressions'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={metric === value}
+                  onClick={() => setMetric(value)}
+                  className={`rounded-md px-2.5 py-1 font-medium capitalize ${metric === value ? 'bg-accent-soft text-ink' : 'text-ink-3 hover:text-ink-2'}`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          }
+        />
+        <div className="p-5">
+          {dailyNow ? (
+            <TrendChart current={dailyNow} previous={dailyBefore} metric={metric} label="Search performance" />
+          ) : (
+            <p className="text-sm text-ink-3">
+              Redeploy the Search Console function (npx supabase functions deploy gsc) to see the daily trend.
+            </p>
+          )}
+        </div>
       </Card>
 
       <Card as="section" aria-labelledby="gsc-local">
@@ -438,7 +476,7 @@ export function SearchConsolePage() {
             </Alert>
           ) : connected && !reconnectNeeded ? (
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <p className="text-slate-800">
+              <p className="text-ink">
                 Connected{status.result?.data?.email ? ` as ${status.result.data.email}` : ''}. Read-only access to Search Console.
               </p>
               <Button variant="secondary" onClick={() => void disconnect()} loading={disconnecting}>
@@ -446,7 +484,7 @@ export function SearchConsolePage() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-3 text-sm text-slate-700">
+            <div className="space-y-3 text-sm text-ink-2">
               <p>
                 {reconnectNeeded
                   ? 'The Google connection has expired. Connect again to keep loading data.'
@@ -481,7 +519,7 @@ export function SearchConsolePage() {
                 }}
               />
               <div className="min-w-[10rem]">
-                <label htmlFor="gsc-days" className="mb-1 block text-sm font-medium text-slate-800">
+                <label htmlFor="gsc-days" className="mb-1 block text-sm font-medium text-ink">
                   Period
                 </label>
                 <select id="gsc-days" className={controlClasses(false)} value={days} onChange={(event) => setParam('days', event.target.value)}>
@@ -493,7 +531,7 @@ export function SearchConsolePage() {
                 </select>
               </div>
             </div>
-            <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+            <p className="border-t border-line-soft px-5 py-3 text-xs text-ink-2">
               Search Console data arrives about 3 days late, so periods end 3 days ago. Each period is compared with the one just before it.
             </p>
           </Card>
@@ -527,9 +565,9 @@ export function SearchConsolePage() {
             </Card>
           ) : (
             <>
-              <p className="mb-4 text-sm text-slate-700">
+              <p className="mb-4 text-sm text-ink-2">
                 Property: <span className="font-medium">{property}</span>{' '}
-                <button type="button" className="font-medium text-indigo-700 hover:underline" onClick={() => setChangingProperty(true)}>
+                <button type="button" className="font-medium text-accent-ink hover:underline" onClick={() => setChangingProperty(true)}>
                   Change
                 </button>
               </p>
@@ -546,9 +584,9 @@ export function SearchConsolePage() {
           )}
 
           {selected && !selected.location && (selected.service_areas ?? []).length === 0 ? (
-            <p className="mt-6 text-xs text-slate-600">
+            <p className="mt-6 text-xs text-ink-2">
               Tip: add a location or{' '}
-              <Link to={`/service-area?project=${selected.id}`} className="font-medium text-indigo-700 hover:underline">
+              <Link to={`/service-area?project=${selected.id}`} className="font-medium text-accent-ink hover:underline">
                 service areas
               </Link>{' '}
               to this project to spot local searches.

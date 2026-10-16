@@ -6,7 +6,7 @@ export function PasswordRequirements({ password, id }: { password: string; id?: 
   return (
     <ul id={id} aria-label="Password requirements" className="space-y-1 text-sm">
       {getPasswordRuleStatus(password).map(({ rule, met }) => (
-        <li key={rule.id} className={`flex items-center gap-2 ${met ? 'text-emerald-700' : 'text-slate-600'}`}>
+        <li key={rule.id} className={`flex items-center gap-2 ${met ? 'text-good' : 'text-ink-2'}`}>
           <Icon name={met ? 'check' : 'info'} className="size-4 shrink-0" />
           <span>
             {rule.label}

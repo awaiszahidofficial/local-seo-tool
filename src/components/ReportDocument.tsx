@@ -9,9 +9,9 @@ const integer = new Intl.NumberFormat('en-US')
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="break-inside-avoid rounded-xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:border-t print:px-0">
-      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      <div className="mt-4 space-y-4 text-sm text-slate-700">{children}</div>
+    <section className="break-inside-avoid rounded-xl border border-line bg-surface p-6 print:rounded-none print:border-0 print:border-t print:px-0">
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+      <div className="mt-4 space-y-4 text-sm text-ink-2">{children}</div>
     </section>
   )
 }
@@ -20,9 +20,9 @@ function Stats({ items }: { items: readonly (readonly [string, ReactNode])[] }) 
   return (
     <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {items.map(([label, value]) => (
-        <div key={label} className="rounded-lg bg-slate-50 px-4 py-3 print:bg-transparent print:px-0">
-          <dt className="text-xs font-medium text-slate-600">{label}</dt>
-          <dd className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+        <div key={label} className="rounded-lg bg-surface-2 px-4 py-3 print:bg-transparent print:px-0">
+          <dt className="text-xs font-medium text-ink-2">{label}</dt>
+          <dd className="mt-1 text-xl font-semibold text-ink tabular-nums">{value}</dd>
         </div>
       ))}
     </dl>
@@ -35,7 +35,7 @@ function pct(value: number | null, suffix = '%'): string {
 }
 
 function NotIncluded({ children }: { children: ReactNode }) {
-  return <p className="text-slate-500 italic">{children}</p>
+  return <p className="text-ink-3 italic">{children}</p>
 }
 
 /** The client-facing report, rendered from a saved snapshot. Print-friendly. */
@@ -43,14 +43,15 @@ export function ReportDocument({ title, snapshot }: { title: string; snapshot: R
   const { project } = snapshot
   return (
     <article className="space-y-6" aria-label={title}>
-      <header className="rounded-xl bg-slate-900 p-6 text-white print:rounded-none print:bg-white print:p-0 print:text-slate-900">
-        <p className="text-xs font-semibold tracking-wide text-indigo-200 uppercase print:text-slate-500">Local SEO report</p>
-        <h1 className="mt-1 text-2xl font-semibold">{title}</h1>
-        <p className="mt-2 text-sm text-slate-300 print:text-slate-600">
-          {project.businessName ?? project.name} · {formatUrlForDisplay(project.website, 60)}
-          {project.location ? ` · ${project.location}` : ''}
+      <header className="relative overflow-hidden rounded-xl border border-line bg-surface p-6 print:rounded-none print:border-0 print:p-0">
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-accent print:hidden" />
+        <p className="text-sm font-medium text-accent-ink">Local SEO report</p>
+        <h1 className="mt-1 text-2xl font-semibold text-ink">{title}</h1>
+        <p className="mt-2 text-sm text-ink-2">
+          {project.businessName ?? project.name}, {formatUrlForDisplay(project.website, 60)}
+          {project.location ? `, ${project.location}` : ''}
         </p>
-        <p className="mt-1 text-xs text-slate-400 print:text-slate-500">Prepared {formatDateTime(snapshot.generatedAt)}</p>
+        <p className="mt-1 text-xs text-ink-3">Prepared {formatDateTime(snapshot.generatedAt)}</p>
       </header>
 
       <Section title="Priorities">
@@ -61,11 +62,11 @@ export function ReportDocument({ title, snapshot }: { title: string; snapshot: R
           <ol className="list-decimal space-y-2 pl-5">
             {snapshot.recommendations.top.map((rec) => (
               <li key={rec.title}>
-                <span className="font-medium text-slate-900">{rec.title}</span>{' '}
-                <span className="text-xs text-slate-500">
+                <span className="font-medium text-ink">{rec.title}</span>{' '}
+                <span className="text-xs text-ink-3">
                   ({IMPACT_LABELS[rec.impact]}, {EFFORT_LABELS[rec.effort].toLowerCase()})
                 </span>
-                <p className="text-slate-600">{rec.detail}</p>
+                <p className="text-ink-2">{rec.detail}</p>
               </li>
             ))}
           </ol>
@@ -97,14 +98,14 @@ export function ReportDocument({ title, snapshot }: { title: string; snapshot: R
               <table className="w-full text-left text-sm">
                 <caption className="sr-only">Top searches</caption>
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs text-slate-600">
+                  <tr className="border-b border-line text-xs text-ink-2">
                     <th scope="col" className="py-2 font-medium">Top searches</th>
                     <th scope="col" className="py-2 text-right font-medium">Clicks</th>
                     <th scope="col" className="py-2 text-right font-medium">Impressions</th>
                     <th scope="col" className="py-2 text-right font-medium">Position</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line-soft">
                   {snapshot.searchConsole.topQueries.map((row) => (
                     <tr key={row.query}>
                       <td className="py-1.5">{row.query}</td>
@@ -137,7 +138,7 @@ export function ReportDocument({ title, snapshot }: { title: string; snapshot: R
               <ul className="list-disc space-y-1 pl-5">
                 {snapshot.gbp.topFixes.map((fix) => (
                   <li key={fix.label}>
-                    <span className="font-medium text-slate-900">{fix.label}:</span> {fix.detail}
+                    <span className="font-medium text-ink">{fix.label}:</span> {fix.detail}
                   </li>
                 ))}
               </ul>
@@ -171,7 +172,7 @@ export function ReportDocument({ title, snapshot }: { title: string; snapshot: R
             ) : null}
             {snapshot.audit ? (
               <>
-                <h3 className="pt-2 font-semibold text-slate-900">Local signals on key pages</h3>
+                <h3 className="pt-2 font-semibold text-ink">Local signals on key pages</h3>
                 <p>
                   {snapshot.audit.passed} checks passed, {snapshot.audit.warnings} to improve, {snapshot.audit.failed} to fix across{' '}
                   {snapshot.audit.pages} pages.
@@ -199,9 +200,9 @@ export function ReportDocument({ title, snapshot }: { title: string; snapshot: R
             <p>{snapshot.coverage.percent}% of service areas have a dedicated page.</p>
             <ul className="grid gap-1 sm:grid-cols-2">
               {snapshot.coverage.areas.map((area) => (
-                <li key={area.name} className="flex justify-between gap-3 border-b border-slate-100 py-1">
+                <li key={area.name} className="flex justify-between gap-3 border-b border-line-soft py-1">
                   <span>{area.name}</span>
-                  <span className={area.status === 'covered' ? 'text-emerald-700' : area.status === 'needs_work' ? 'text-amber-700' : 'text-red-700'}>
+                  <span className={area.status === 'covered' ? 'text-good' : area.status === 'needs_work' ? 'text-warn' : 'text-bad'}>
                     {AREA_STATUS_LABELS[area.status]}
                   </span>
                 </li>

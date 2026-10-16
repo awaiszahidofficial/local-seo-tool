@@ -134,14 +134,14 @@ export function KeywordsPage() {
             </Button>
           ) : null}
         </div>
-        <fieldset className="border-t border-slate-100 px-5 py-3">
+        <fieldset className="border-t border-line-soft px-5 py-3">
           <legend className="sr-only">Keyword patterns</legend>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-700">
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-2">
             {ALL_PATTERNS.map((pattern) => (
               <label key={pattern} className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="size-4 rounded border-slate-300 text-indigo-600"
+                  className="size-4 rounded border-line-strong text-accent-ink"
                   checked={patterns.includes(pattern)}
                   onChange={(event) =>
                     setPatterns((current) =>
@@ -202,11 +202,11 @@ export function KeywordsPage() {
               title={`${integer.format(report.rows.length)} keywords`}
               description={`${report.services.length} ${report.services.length === 1 ? 'service' : 'services'} × ${report.areas.length} ${report.areas.length === 1 ? 'area' : 'areas'}${report.gscUsed ? '; positions from the last 90 days of Search Console data' : ''}. Search volumes are not included: check them in a keyword tool before prioritising.`}
             />
-            <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-px bg-subtle sm:grid-cols-4">
               {(Object.keys(ACTION_LABELS) as KeywordAction[]).map((action) => (
-                <div key={action} className="bg-white px-5 py-4">
-                  <dt className="text-xs font-medium text-slate-600">{ACTION_LABELS[action]}</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{report.counts[action]}</dd>
+                <div key={action} className="bg-surface px-5 py-4">
+                  <dt className="text-xs font-medium text-ink-2">{ACTION_LABELS[action]}</dt>
+                  <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{report.counts[action]}</dd>
                 </div>
               ))}
             </dl>
@@ -234,7 +234,7 @@ export function KeywordsPage() {
               }
             />
             {visible.length === 0 ? (
-              <p className="px-5 py-6 text-center text-sm text-slate-600">No keywords match this filter.</p>
+              <p className="px-5 py-6 text-center text-sm text-ink-2">No keywords match this filter.</p>
             ) : (
               <Table aria-label="Keyword opportunities">
                 <thead>
@@ -253,10 +253,10 @@ export function KeywordsPage() {
                     const href = row.page ? getSafeHttpUrl(row.page.url) : null
                     return (
                       <tr key={row.keyword}>
-                        <Td className="font-medium text-slate-900">
+                        <Td className="font-medium text-ink">
                           {row.keyword}
                           {row.gsc && row.gsc.topQuery !== row.keyword ? (
-                            <p className="mt-0.5 text-xs font-normal text-slate-500">
+                            <p className="mt-0.5 text-xs font-normal text-ink-3">
                               Top search: “{row.gsc.topQuery}”{row.gsc.matchingQueries > 1 ? ` +${row.gsc.matchingQueries - 1} similar` : ''}
                             </p>
                           ) : null}
@@ -264,13 +264,13 @@ export function KeywordsPage() {
                         <Td className="max-w-xs">
                           {row.page && href ? (
                             <>
-                              <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-indigo-700 hover:underline">
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-accent-ink hover:underline">
                                 {formatUrlForDisplay(row.page.url, 45)}
                               </a>
-                              {row.page.match === 'service_only' ? <p className="text-xs text-slate-500">Service page, not specific to {row.area}</p> : null}
+                              {row.page.match === 'service_only' ? <p className="text-xs text-ink-3">Service page, not specific to {row.area}</p> : null}
                             </>
                           ) : (
-                            <span className="text-slate-500">No page</span>
+                            <span className="text-ink-3">No page</span>
                           )}
                         </Td>
                         <Td>
@@ -289,7 +289,7 @@ export function KeywordsPage() {
               </Table>
             )}
             {visible.length > limit ? (
-              <div className="border-t border-slate-100 px-5 py-3">
+              <div className="border-t border-line-soft px-5 py-3">
                 <Button variant="secondary" onClick={() => setLimit((value) => value + 100)}>
                   Show more ({integer.format(visible.length - limit)} left)
                 </Button>

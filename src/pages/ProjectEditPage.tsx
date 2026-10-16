@@ -39,7 +39,7 @@ export function ProjectEditPage() {
         eyebrow={
           <Link
             to={`/projects/${project.id}`}
-            className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent-ink hover:underline"
           >
             <Icon name="arrowLeft" className="size-4" />
             {project.name}

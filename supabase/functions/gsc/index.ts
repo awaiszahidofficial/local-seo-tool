@@ -45,6 +45,10 @@ const CORS_HEADERS = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const GOOGLE_TIMEOUT_MS = 20_000
 
+function sortByKey<T extends { key: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a.key.localeCompare(b.key))
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
 }
@@ -160,7 +164,7 @@ async function listSites(token: string): Promise<{ siteUrl: string; permissionLe
     .sort((a, b) => a.siteUrl.localeCompare(b.siteUrl))
 }
 
-async function searchAnalytics(token: string, siteUrl: string, range: DateRange, dimension: 'query' | 'page' | null) {
+async function searchAnalytics(token: string, siteUrl: string, range: DateRange, dimension: 'query' | 'page' | 'date' | null) {
   const { status, body } = await google(`${GSC_API}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -317,13 +321,15 @@ Deno.serve(async (req: Request) => {
         const token = await accessToken(admin, config, connection)
         const ranges = periodRanges(new Date(), body.days)
 
-        const [totalsNow, totalsBefore, queriesNow, queriesBefore, pagesNow, pagesBefore] = await Promise.all([
+        const [totalsNow, totalsBefore, queriesNow, queriesBefore, pagesNow, pagesBefore, dailyNow, dailyBefore] = await Promise.all([
           searchAnalytics(token, property, ranges.current, null),
           searchAnalytics(token, property, ranges.previous, null),
           searchAnalytics(token, property, ranges.current, 'query'),
           searchAnalytics(token, property, ranges.previous, 'query'),
           searchAnalytics(token, property, ranges.current, 'page'),
           searchAnalytics(token, property, ranges.previous, 'page'),
+          searchAnalytics(token, property, ranges.current, 'date'),
+          searchAnalytics(token, property, ranges.previous, 'date'),
         ])
         return json({
           property,
@@ -331,6 +337,7 @@ Deno.serve(async (req: Request) => {
           totals: { current: normalizeTotals(totalsNow), previous: normalizeTotals(totalsBefore) },
           queries: { current: normalizeRows(queriesNow), previous: normalizeRows(queriesBefore) },
           pages: { current: normalizeRows(pagesNow), previous: normalizeRows(pagesBefore) },
+          daily: { current: sortByKey(normalizeRows(dailyNow)), previous: sortByKey(normalizeRows(dailyBefore)) },
         })
       }
 

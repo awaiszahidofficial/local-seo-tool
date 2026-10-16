@@ -52,7 +52,7 @@ const FIELD_LABELS = { name: 'Name', address: 'Address', phone: 'Phone', website
 function FieldMark({ check, label }: { check: FieldCheck; label: string }) {
   if (check === 'match') {
     return (
-      <span className="text-emerald-700" title={`${label} matches`}>
+      <span className="text-good" title={`${label} matches`}>
         <span aria-hidden="true">✓</span>
         <span className="sr-only">{label} matches</span>
       </span>
@@ -60,14 +60,14 @@ function FieldMark({ check, label }: { check: FieldCheck; label: string }) {
   }
   if (check === 'mismatch') {
     return (
-      <span className="font-semibold text-red-700" title={`${label} differs`}>
+      <span className="font-semibold text-bad" title={`${label} differs`}>
         <span aria-hidden="true">✗</span>
         <span className="sr-only">{label} differs</span>
       </span>
     )
   }
   return (
-    <span className="text-slate-400" title={check === 'no_reference' ? 'No reference value to compare' : 'Not entered'}>
+    <span className="text-ink-3" title={check === 'no_reference' ? 'No reference value to compare' : 'Not entered'}>
       <span aria-hidden="true">—</span>
       <span className="sr-only">{label} not checked</span>
     </span>
@@ -135,7 +135,7 @@ function ListingForm({ project, reference, editing, initialDirectory, onSaved, o
             value={values.directory}
             error={errors.directory}
             onChange={(event) => set('directory', event.target.value)}
-            hint={directoryUrl ? <a href={directoryUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-700 hover:underline">Open {values.directory} for business</a> : undefined}
+            hint={directoryUrl ? <a href={directoryUrl} target="_blank" rel="noopener noreferrer" className="text-accent-ink hover:underline">Open {values.directory} for business</a> : undefined}
           />
           <datalist id="directory-options">
             {DIRECTORIES.map((directory) => (
@@ -220,16 +220,16 @@ function ListingsTable({ checks, onEdit, onDelete }: { checks: ListingCheck[]; o
           const href = getSafeHttpUrl(listing.listing_url)
           return (
             <tr key={listing.id}>
-              <Td className="font-medium text-slate-900">
+              <Td className="font-medium text-ink">
                 {href ? (
-                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-700 hover:underline">
+                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent-ink hover:underline">
                     {listing.directory}
                     <span className="sr-only"> (opens in a new tab)</span>
                   </a>
                 ) : (
                   listing.directory
                 )}
-                {listing.notes ? <p className="mt-0.5 max-w-xs text-xs font-normal break-words text-slate-500">{listing.notes}</p> : null}
+                {listing.notes ? <p className="mt-0.5 max-w-xs text-xs font-normal break-words text-ink-3">{listing.notes}</p> : null}
               </Td>
               <Td>
                 <StatusBadge tone={STATUS_TONE[listing.status]}>{LISTING_STATUS_LABELS[listing.status]}</StatusBadge>
@@ -383,8 +383,8 @@ export function ListingsPage() {
             <dl className="grid gap-x-6 gap-y-3 p-5 text-sm sm:grid-cols-2">
               {(['name', 'phone', 'address', 'website'] as const).map((field) => (
                 <div key={field}>
-                  <dt className="text-xs font-medium text-slate-600">{FIELD_LABELS[field]}</dt>
-                  <dd className="mt-0.5 break-words text-slate-900">{reference[field] ?? <span className="text-slate-500">Not set</span>}</dd>
+                  <dt className="text-xs font-medium text-ink-2">{FIELD_LABELS[field]}</dt>
+                  <dd className="mt-0.5 break-words text-ink">{reference[field] ?? <span className="text-ink-3">Not set</span>}</dd>
                 </div>
               ))}
             </dl>
@@ -409,7 +409,7 @@ export function ListingsPage() {
             <>
               <Card as="section" aria-labelledby="listings-summary" className="mb-6">
                 <CardHeader id="listings-summary" title="Summary" />
-                <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-px bg-subtle sm:grid-cols-4">
                   {(
                     [
                       ['Live listings', summary.live],
@@ -418,9 +418,9 @@ export function ListingsPage() {
                       ['Essential missing', summary.missingCore.length],
                     ] as const
                   ).map(([label, value]) => (
-                    <div key={label} className="bg-white px-5 py-4">
-                      <dt className="text-xs font-medium text-slate-600">{label}</dt>
-                      <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+                    <div key={label} className="bg-surface px-5 py-4">
+                      <dt className="text-xs font-medium text-ink-2">{label}</dt>
+                      <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -435,7 +435,7 @@ export function ListingsPage() {
                         <button
                           type="button"
                           onClick={() => setFormState({ editing: null, directory: name })}
-                          className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-50"
+                          className="rounded-full border border-warn/30 bg-surface px-3 py-1 text-xs font-medium text-warn hover:bg-warn-soft"
                         >
                           + {name}
                         </button>
@@ -465,21 +465,21 @@ export function ListingsPage() {
                 )}
               </Card>
 
-              <details className="mt-6 rounded-xl border border-slate-200 bg-white p-5 text-sm">
-                <summary className="cursor-pointer font-medium text-slate-900">Suggested directories</summary>
+              <details className="mt-6 rounded-xl border border-line bg-surface p-5 text-sm">
+                <summary className="cursor-pointer font-medium text-ink">Suggested directories</summary>
                 <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                   {DIRECTORIES.map((directory) => (
                     <li key={directory.name} className="flex items-center justify-between gap-2">
-                      <a href={directory.addUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-700 hover:underline">
+                      <a href={directory.addUrl} target="_blank" rel="noopener noreferrer" className="text-accent-ink hover:underline">
                         {directory.name}
                       </a>
-                      <span className="text-xs text-slate-500">{TIER_LABELS[directory.tier]}</span>
+                      <span className="text-xs text-ink-3">{TIER_LABELS[directory.tier]}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-ink-3">
                   Check with the{' '}
-                  <Link to={`/gbp-audit?project=${selected.id}`} className="text-indigo-700 hover:underline">
+                  <Link to={`/gbp-audit?project=${selected.id}`} className="text-accent-ink hover:underline">
                     Business Profile audit
                   </Link>{' '}
                   that the profile itself is complete first.
@@ -500,7 +500,7 @@ export function ListingsPage() {
         onCancel={() => setPendingDelete(null)}
       >
         <p>
-          The record for <strong className="font-semibold text-slate-900">{pendingDelete?.directory}</strong> will be removed from this
+          The record for <strong className="font-semibold text-ink">{pendingDelete?.directory}</strong> will be removed from this
           app. The listing on the directory itself is not affected.
         </p>
       </ConfirmDialog>

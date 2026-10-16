@@ -51,14 +51,14 @@ export function ConfirmDialog({
       onClick={(event) => {
         if (event.target === dialogRef.current && !busy) onCancel()
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/50"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-line bg-surface p-0 shadow-xl backdrop:bg-black/60"
     >
       {open ? (
         <div className="p-6">
-          <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+          <h2 id={titleId} className="text-lg font-semibold text-ink">
             {title}
           </h2>
-          <div className="mt-2 text-sm text-slate-600">{children}</div>
+          <div className="mt-2 text-sm text-ink-2">{children}</div>
           {error ? <Alert variant="error" className="mt-4">{error}</Alert> : null}
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>

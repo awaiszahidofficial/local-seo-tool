@@ -45,12 +45,12 @@ function RecItem({
     <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium text-slate-900">{rec.title}</p>
+          <p className="font-medium text-ink">{rec.title}</p>
           <StatusBadge tone={IMPACT_TONE[rec.impact]}>{IMPACT_LABELS[rec.impact]}</StatusBadge>
           <StatusBadge tone="neutral">{EFFORT_LABELS[rec.effort]}</StatusBadge>
         </div>
-        <p className="mt-1 text-sm break-words text-slate-600">{rec.detail}</p>
-        <Link to={rec.link} className="mt-1 inline-block text-xs font-medium text-indigo-700 hover:underline">
+        <p className="mt-1 text-sm break-words text-ink-2">{rec.detail}</p>
+        <Link to={rec.link} className="mt-1 inline-block text-xs font-medium text-accent-ink hover:underline">
           Open {MODULE_LABELS[rec.module]}
         </Link>
       </div>
@@ -174,7 +174,7 @@ export function RecommendationsPage() {
           />
           {selected ? (
             <div className="min-w-[12rem]">
-              <label htmlFor="recs-module" className="mb-1 block text-sm font-medium text-slate-800">
+              <label htmlFor="recs-module" className="mb-1 block text-sm font-medium text-ink">
                 Module
               </label>
               <select id="recs-module" className={controlClasses(false)} value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value as 'all' | RecModule)}>
@@ -232,8 +232,8 @@ export function RecommendationsPage() {
                 aria-selected={view === key}
                 onClick={() => setView(key)}
                 className={[
-                  'rounded-lg px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-indigo-600',
-                  view === key ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+                  'rounded-lg px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-accent',
+                  view === key ? 'bg-accent text-white' : 'bg-surface text-ink-2 ring-1 ring-line-strong hover:bg-surface-2',
                 ].join(' ')}
               >
                 {VIEW_LABELS[key]} ({groups[key].length})
@@ -249,14 +249,14 @@ export function RecommendationsPage() {
                 description={view === 'open' ? 'Crawl again after making changes to check for anything new.' : 'Recommendations you mark appear here.'}
               />
             ) : (
-              <ol className="divide-y divide-slate-100" aria-label="Recommendations">
+              <ol className="divide-y divide-line-soft" aria-label="Recommendations">
                 {visible.map((rec) => (
                   <RecItem key={rec.key} rec={rec} view={view} busy={busyKey === rec.key} onChange={(status) => void change(rec, status)} />
                 ))}
               </ol>
             )}
           </Card>
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-ink-3">
             Recommendations are recalculated from the latest data each time; marking one done does not hide it from the module itself. If a
             problem still shows after you fixed it, crawl again or update the details.
           </p>

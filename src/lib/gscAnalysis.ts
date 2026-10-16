@@ -181,3 +181,33 @@ export function suggestProperty(websiteUrl: string, sites: readonly { siteUrl: s
   })
   return prefix?.siteUrl ?? null
 }
+
+// ---- Daily trend -----------------------------------------------------------------------------
+
+export type DailyPoint = { date: string; clicks: number; impressions: number }
+
+/** One point per day of the range; days Google reports nothing for count as zero. */
+export function dailySeries(range: { startDate: string; endDate: string }, rows: readonly GscRow[]): DailyPoint[] {
+  const byDate = new Map(rows.map((row) => [row.key, row]))
+  const out: DailyPoint[] = []
+  const start = Date.parse(`${range.startDate}T00:00:00Z`)
+  const end = Date.parse(`${range.endDate}T00:00:00Z`)
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return out
+  for (let time = start; time <= end && out.length < 400; time += 86_400_000) {
+    const date = new Date(time).toISOString().slice(0, 10)
+    const row = byDate.get(date)
+    out.push({ date, clicks: row?.clicks ?? 0, impressions: row?.impressions ?? 0 })
+  }
+  return out
+}
+
+/** Rounds a maximum up to a tidy axis limit (1, 2, 2.5, 5 × 10ⁿ). */
+export function niceMax(value: number): number {
+  if (value <= 0) return 1
+  const exponent = Math.floor(Math.log10(value))
+  const base = 10 ** exponent
+  for (const step of [1, 2, 2.5, 5, 10]) {
+    if (value <= step * base) return step * base
+  }
+  return 10 * base
+}

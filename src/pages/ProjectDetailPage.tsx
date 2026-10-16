@@ -17,13 +17,13 @@ import { ProjectNotFound } from './ProjectNotFound'
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="px-5 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-      <dt className="text-sm font-medium text-slate-600">{label}</dt>
-      <dd className="mt-1 min-w-0 text-sm break-words text-slate-900 sm:col-span-2 sm:mt-0">{children}</dd>
+      <dt className="text-sm font-medium text-ink-2">{label}</dt>
+      <dd className="mt-1 min-w-0 text-sm break-words text-ink sm:col-span-2 sm:mt-0">{children}</dd>
     </div>
   )
 }
 
-const NOT_PROVIDED = <span className="text-slate-500">Not provided</span>
+const NOT_PROVIDED = <span className="text-ink-3">Not provided</span>
 
 export function ProjectDetailPage() {
   const { projectId } = useParams()
@@ -63,7 +63,7 @@ export function ProjectDetailPage() {
     <>
       <PageHeader
         eyebrow={
-          <Link to="/projects" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:underline">
+          <Link to="/projects" className="inline-flex items-center gap-1 text-sm font-medium text-accent-ink hover:underline">
             <Icon name="arrowLeft" className="size-4" />
             Projects
           </Link>
@@ -102,14 +102,14 @@ export function ProjectDetailPage() {
 
       <Card as="section" aria-labelledby="project-details" className="max-w-3xl">
         <CardHeader id="project-details" title="Project details" />
-        <dl className="divide-y divide-slate-100">
+        <dl className="divide-y divide-line-soft">
           <Detail label="Website">
             {websiteHref ? (
               <a
                 href={websiteHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-indigo-700 hover:underline"
+                className="inline-flex items-center gap-1 text-accent-ink hover:underline"
               >
                 <span className="break-all">{project.website_url}</span>
                 <Icon name="external" className="size-3.5 shrink-0" />
@@ -142,7 +142,7 @@ export function ProjectDetailPage() {
         }}
       >
         <p>
-          <strong className="font-semibold text-slate-900">{project.name}</strong> will be permanently deleted.
+          <strong className="font-semibold text-ink">{project.name}</strong> will be permanently deleted.
           This cannot be undone.
         </p>
       </ConfirmDialog>

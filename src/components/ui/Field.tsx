@@ -26,10 +26,10 @@ export function FieldFrame({ id, label, required, error, hint, children }: Field
 
   return (
     <div>
-      <label htmlFor={controlId} className="mb-1.5 block text-sm font-medium text-slate-800">
+      <label htmlFor={controlId} className="mb-1.5 block text-sm font-medium text-ink">
         {label}
         {required ? (
-          <span aria-hidden="true" className="ml-0.5 text-red-600">
+          <span aria-hidden="true" className="ml-0.5 text-bad">
             *
           </span>
         ) : null}
@@ -41,12 +41,12 @@ export function FieldFrame({ id, label, required, error, hint, children }: Field
         'aria-required': required ? true : undefined,
       })}
       {error ? (
-        <p id={errorId} role="alert" className="mt-1.5 text-sm text-red-700">
+        <p id={errorId} role="alert" className="mt-1.5 text-sm text-bad">
           {error}
         </p>
       ) : null}
       {hint ? (
-        <p id={hintId} className="mt-1.5 text-sm text-slate-600">
+        <p id={hintId} className="mt-1.5 text-sm text-ink-2">
           {hint}
         </p>
       ) : null}

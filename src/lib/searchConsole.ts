@@ -16,6 +16,8 @@ export type GscPerformance = {
   totals: { current: GscTotals; previous: GscTotals }
   queries: { current: GscRow[]; previous: GscRow[] }
   pages: { current: GscRow[]; previous: GscRow[] }
+  /** Per-day rows (key = YYYY-MM-DD). Missing when the gsc function predates the trend chart. */
+  daily?: { current: GscRow[]; previous: GscRow[] }
 }
 
 const NETWORK_ERROR = 'Could not reach the server. Check your connection and try again.'

@@ -30,6 +30,13 @@ const PATHS = {
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
   info: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 11v5', 'M12 8h.01'],
   arrowLeft: ['M19 12H5', 'M11 6l-6 6 6 6'],
+  sun: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M12 2v2', 'M12 20v2', 'M4.9 4.9l1.4 1.4', 'M17.7 17.7l1.4 1.4', 'M2 12h2', 'M20 12h2', 'M4.9 19.1l1.4-1.4', 'M17.7 6.3l1.4-1.4'],
+  moon: ['M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z'],
+  monitor: ['M3 5h18v11H3z', 'M8 20h8', 'M12 16v4'],
+  chevronDown: ['M6 9l6 6 6-6'],
+  chevronRight: ['M9 6l6 6-6 6'],
+  command: ['M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z'],
+  user: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4 21a8 8 0 0 1 16 0'],
 } as const satisfies Record<string, readonly string[]>
 
 export type IconName = keyof typeof PATHS

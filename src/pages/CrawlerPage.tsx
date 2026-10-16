@@ -38,7 +38,7 @@ const FILTER_LABELS: Record<IssueFilter, string> = {
 
 function IssueBadges({ issues }: { issues: string[] }) {
   const sorted = sortIssues(issues)
-  if (sorted.length === 0) return <span className="text-slate-500">No issues</span>
+  if (sorted.length === 0) return <span className="text-ink-3">No issues</span>
   return (
     <ul className="flex flex-wrap gap-1">
       {sorted.map((code) => (
@@ -62,16 +62,16 @@ function PageRow({ page, startUrl }: { page: CrawlPageRow; startUrl: string }) {
     <tr>
       <Td className="max-w-xs">
         {href ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-indigo-700 hover:underline">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-accent-ink hover:underline">
             {formatUrlForDisplay(page.url, 60)}
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
         ) : (
           <span className="break-all">{page.url}</span>
         )}
-        {page.url === startUrl ? <span className="ml-2 text-xs text-slate-500">(start page)</span> : null}
+        {page.url === startUrl ? <span className="ml-2 text-xs text-ink-3">(start page)</span> : null}
         {page.final_url ? (
-          <p className="mt-0.5 text-xs break-all text-slate-500">Redirects to {formatUrlForDisplay(page.final_url, 60)}</p>
+          <p className="mt-0.5 text-xs break-all text-ink-3">Redirects to {formatUrlForDisplay(page.final_url, 60)}</p>
         ) : null}
       </Td>
       <Td>
@@ -82,9 +82,9 @@ function PageRow({ page, startUrl }: { page: CrawlPageRow; startUrl: string }) {
         )}
       </Td>
       <Td className="max-w-xs">
-        {page.title ?? <span className="text-slate-500">{page.error ?? 'Missing'}</span>}
+        {page.title ?? <span className="text-ink-3">{page.error ?? 'Missing'}</span>}
       </Td>
-      <Td className="max-w-[14rem]">{page.h1 ?? <span className="text-slate-500">—</span>}</Td>
+      <Td className="max-w-[14rem]">{page.h1 ?? <span className="text-ink-3">—</span>}</Td>
       <Td className="text-right tabular-nums">{page.error ? '—' : page.word_count}</Td>
       <Td>
         <IssueBadges issues={page.issues} />
@@ -205,7 +205,7 @@ export function CrawlerPage() {
             {running ? 'Crawling…' : crawl ? 'Crawl again' : 'Start crawl'}
           </Button>
         </div>
-        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+        <p className="border-t border-line-soft px-5 py-3 text-xs text-ink-2">
           Crawls up to {formatPageLimit()} pages of this one website, follows links on the same site only, and
           respects robots.txt. Small sites take about a minute; large sites can take several minutes.
         </p>
@@ -296,16 +296,16 @@ export function CrawlerPage() {
               </div>
             ) : (
               <>
-                <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-px bg-subtle sm:grid-cols-4">
                   {[
                     ['Pages crawled', summary.totalPages],
                     ['Pages with errors', summary.pagesWithErrors],
                     ['Pages with warnings', summary.pagesWithWarnings],
                     ['No errors or warnings', summary.cleanPages],
                   ].map(([label, value]) => (
-                    <div key={label} className="bg-white px-5 py-4">
-                      <dt className="text-xs font-medium text-slate-600">{label}</dt>
-                      <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+                    <div key={label} className="bg-surface px-5 py-4">
+                      <dt className="text-xs font-medium text-ink-2">{label}</dt>
+                      <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -321,16 +321,16 @@ export function CrawlerPage() {
           {crawl.status === 'completed' && summary.issueCounts.length > 0 ? (
             <Card as="section" aria-labelledby="issue-breakdown">
               <CardHeader id="issue-breakdown" title="Issues found" description="Counted by number of pages affected." />
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line-soft">
                 {summary.issueCounts.map((entry) => (
                   <li key={entry.code} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
                     <span className="flex items-center gap-3">
                       <StatusBadge tone={SEVERITY_TONE[entry.severity]}>
                         {entry.severity === 'error' ? 'Error' : entry.severity === 'warning' ? 'Warning' : 'Notice'}
                       </StatusBadge>
-                      <span className="text-slate-800">{isIssueCode(entry.code) ? ISSUE_META[entry.code].label : entry.code}</span>
+                      <span className="text-ink">{isIssueCode(entry.code) ? ISSUE_META[entry.code].label : entry.code}</span>
                     </span>
-                    <span className="font-medium text-slate-900 tabular-nums">
+                    <span className="font-medium text-ink tabular-nums">
                       {entry.count} {entry.count === 1 ? 'page' : 'pages'}
                     </span>
                   </li>
@@ -374,7 +374,7 @@ export function CrawlerPage() {
                   description={stopNote ?? 'The crawl finished without finding any pages to record.'}
                 />
               ) : visiblePages.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-600">No pages match this filter.</p>
+                <p className="px-5 py-8 text-center text-sm text-ink-2">No pages match this filter.</p>
               ) : (
                 <Table aria-label="Crawled pages">
                   <thead>
@@ -395,8 +395,8 @@ export function CrawlerPage() {
                 </Table>
               )}
               {visiblePages.length > rowLimit ? (
-                <div className="flex items-center justify-between gap-4 border-t border-slate-100 px-5 py-3 text-sm">
-                  <span className="text-slate-600">
+                <div className="flex items-center justify-between gap-4 border-t border-line-soft px-5 py-3 text-sm">
+                  <span className="text-ink-2">
                     Showing {rowLimit.toLocaleString('en-US')} of {visiblePages.length.toLocaleString('en-US')} pages
                   </span>
                   <Button variant="secondary" onClick={() => setRowLimit((value) => value + ROWS_STEP * 2)}>
@@ -407,10 +407,10 @@ export function CrawlerPage() {
             </Card>
           ) : null}
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-3">
             Results describe the pages as fetched without running JavaScript. Pages that depend on scripts to show
             their content may look thinner here than in a browser.{' '}
-            <Link to={`/projects/${selected.id}`} className="font-medium text-indigo-700 hover:underline">
+            <Link to={`/projects/${selected.id}`} className="font-medium text-accent-ink hover:underline">
               View project
             </Link>
           </p>

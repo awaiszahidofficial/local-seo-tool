@@ -51,7 +51,7 @@ export function SignInPage() {
       footer={
         <>
           New to Local SEO Workbench?{' '}
-          <Link to="/sign-up" className="font-medium text-indigo-700 hover:underline">
+          <Link to="/sign-up" className="font-medium text-accent-ink hover:underline">
             Create an account
           </Link>
         </>
@@ -83,7 +83,7 @@ export function SignInPage() {
         />
 
         <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-sm font-medium text-indigo-700 hover:underline">
+          <Link to="/forgot-password" className="text-sm font-medium text-accent-ink hover:underline">
             Forgot your password?
           </Link>
         </div>

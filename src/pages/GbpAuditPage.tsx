@@ -84,12 +84,12 @@ function TriSelect({ id, label, value, onChange, hint }: { id: string; label: st
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
-    <fieldset className="border-t border-slate-100 px-5 py-5 first:border-t-0">
+    <fieldset className="border-t border-line-soft px-5 py-5 first:border-t-0">
       <legend className="sr-only">{title}</legend>
-      <h3 className="text-sm font-semibold text-slate-900" aria-hidden="true">
+      <h3 className="text-sm font-semibold text-ink" aria-hidden="true">
         {title}
       </h3>
-      {description ? <p className="mt-0.5 text-xs text-slate-600">{description}</p> : null}
+      {description ? <p className="mt-0.5 text-xs text-ink-2">{description}</p> : null}
       <div className="mt-4 grid gap-4 md:grid-cols-2">{children}</div>
     </fieldset>
   )
@@ -217,11 +217,11 @@ function ProfileForm({ project, profile, onSaved }: ProfileFormProps) {
             <input
               id="gbp-service_area_business"
               type="checkbox"
-              className="mt-0.5 size-4 rounded border-slate-300 text-indigo-600"
+              className="mt-0.5 size-4 rounded border-line-strong text-accent-ink"
               checked={values.service_area_business}
               onChange={(event) => set('service_area_business', event.target.checked)}
             />
-            <label htmlFor="gbp-service_area_business" className="text-sm text-slate-800">
+            <label htmlFor="gbp-service_area_business" className="text-sm text-ink">
               Service-area business (visits customers; address hidden)
             </label>
           </div>
@@ -261,7 +261,7 @@ function ProfileForm({ project, profile, onSaved }: ProfileFormProps) {
           {text('last_post_date', 'Date of the latest post', { type: 'date', hint: 'Leave empty if the profile has never posted.' })}
         </Section>
 
-        <div className="space-y-3 border-t border-slate-100 px-5 py-4">
+        <div className="space-y-3 border-t border-line-soft px-5 py-4">
           {saveError ? (
             <Alert variant="error" title="Could not save">
               {saveError}
@@ -271,7 +271,7 @@ function ProfileForm({ project, profile, onSaved }: ProfileFormProps) {
             <Button type="submit" loading={saving}>
               Save and audit
             </Button>
-            {saved ? <span className="text-sm text-emerald-700">Saved. The audit above is updated.</span> : null}
+            {saved ? <span className="text-sm text-good">Saved. The audit above is updated.</span> : null}
           </div>
         </div>
       </form>
@@ -283,15 +283,15 @@ function ProfileForm({ project, profile, onSaved }: ProfileFormProps) {
 
 function CheckList({ checks, label }: { checks: readonly GbpCheck[]; label: string }) {
   return (
-    <ul aria-label={label} className="divide-y divide-slate-100">
+    <ul aria-label={label} className="divide-y divide-line-soft">
       {checks.map((check) => (
         <li key={check.id} className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-start sm:gap-4">
           <span className="w-24 shrink-0">
             <StatusBadge tone={STATUS_BADGE[check.status].tone}>{STATUS_BADGE[check.status].label}</StatusBadge>
           </span>
           <div className="min-w-0 text-sm">
-            <p className="font-medium text-slate-900">{check.label}</p>
-            <p className="mt-0.5 break-words text-slate-600">{check.detail}</p>
+            <p className="font-medium text-ink">{check.label}</p>
+            <p className="mt-0.5 break-words text-ink-2">{check.detail}</p>
           </div>
         </li>
       ))}
@@ -300,14 +300,14 @@ function CheckList({ checks, label }: { checks: readonly GbpCheck[]; label: stri
 }
 
 function AuditResults({ audit, savedAt }: { audit: GbpAudit; savedAt: string }) {
-  const scoreTone = audit.score === null ? 'text-slate-500' : audit.score >= 80 ? 'text-emerald-700' : audit.score >= 60 ? 'text-amber-700' : 'text-red-700'
+  const scoreTone = audit.score === null ? 'text-ink-3' : audit.score >= 80 ? 'text-good' : audit.score >= 60 ? 'text-warn' : 'text-bad'
   return (
     <div className="mb-6 space-y-6">
       <Card as="section" aria-labelledby="gbp-summary">
         <CardHeader id="gbp-summary" title="Profile score" description={`Details last saved ${formatDateTime(savedAt)}.`} />
-        <dl className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-5">
-          <div className="bg-white px-5 py-4">
-            <dt className="text-xs font-medium text-slate-600">Score</dt>
+        <dl className="grid grid-cols-2 gap-px bg-subtle sm:grid-cols-5">
+          <div className="bg-surface px-5 py-4">
+            <dt className="text-xs font-medium text-ink-2">Score</dt>
             <dd className={`mt-1 text-2xl font-semibold tabular-nums ${scoreTone}`}>{audit.score === null ? '—' : `${audit.score}/100`}</dd>
           </div>
           {(
@@ -318,14 +318,14 @@ function AuditResults({ audit, savedAt }: { audit: GbpAudit; savedAt: string }) 
               ['Not entered', audit.counts.missing],
             ] as const
           ).map(([label, value]) => (
-            <div key={label} className="bg-white px-5 py-4">
-              <dt className="text-xs font-medium text-slate-600">{label}</dt>
-              <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+            <div key={label} className="bg-surface px-5 py-4">
+              <dt className="text-xs font-medium text-ink-2">{label}</dt>
+              <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{value}</dd>
             </div>
           ))}
         </dl>
         {audit.missing.length > 0 ? (
-          <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+          <p className="border-t border-line-soft px-5 py-3 text-xs text-ink-2">
             The score covers only what was entered. Still to fill in: {audit.missing.join(', ')}.
           </p>
         ) : null}
@@ -341,11 +341,11 @@ function AuditResults({ audit, savedAt }: { audit: GbpAudit; savedAt: string }) 
       ) : null}
 
       {audit.groups.map((group) => (
-        <details key={group.group} className="group rounded-xl border border-slate-200 bg-white shadow-sm">
-          <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-indigo-600">
-            <Icon name="arrowLeft" className="size-4 shrink-0 -rotate-90 text-slate-500 transition-transform group-open:rotate-90" />
-            <span className="flex-1 font-medium text-slate-900">{group.label}</span>
-            <span className="text-xs text-slate-600">
+        <details key={group.group} className="group rounded-xl border border-line bg-surface shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
+            <Icon name="arrowLeft" className="size-4 shrink-0 -rotate-90 text-ink-3 transition-transform group-open:rotate-90" />
+            <span className="flex-1 font-medium text-ink">{group.label}</span>
+            <span className="text-xs text-ink-2">
               {group.checks.filter((check) => check.status === 'pass').length} of {group.checks.length} passed
             </span>
           </summary>
@@ -354,7 +354,7 @@ function AuditResults({ audit, savedAt }: { audit: GbpAudit; savedAt: string }) 
       ))}
 
       {!audit.crawlUsed ? (
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-ink-2">
           Crawl the website to compare its phone number, name and address with the profile.
         </p>
       ) : null}
@@ -439,7 +439,7 @@ export function GbpAuditPage() {
             }}
           />
         </div>
-        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
+        <p className="border-t border-line-soft px-5 py-3 text-xs text-ink-2">
           Details are entered by hand, so the audit is as current as the last time you updated them. Website checks use
           the latest crawl.
         </p>

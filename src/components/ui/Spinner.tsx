@@ -15,8 +15,8 @@ export function Spinner({ className = 'size-4' }: { className?: string }) {
 
 export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   return (
-    <div role="status" className="flex items-center justify-center gap-3 py-16 text-sm text-slate-600">
-      <Spinner className="size-5 text-indigo-600" />
+    <div role="status" className="flex items-center justify-center gap-3 py-16 text-sm text-ink-2">
+      <Spinner className="size-5 text-accent-ink" />
       <span>{label}</span>
     </div>
   )

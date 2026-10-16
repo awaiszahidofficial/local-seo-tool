@@ -26,7 +26,7 @@ export function ModulePlaceholder({ module }: { module: ModuleMeta }) {
           title="What this module is intended to do"
           description="Intended capabilities, subject to change. None of these are available today."
         />
-        <ul className="list-disc space-y-2 px-9 py-5 text-sm text-slate-700">
+        <ul className="list-disc space-y-2 px-9 py-5 text-sm text-ink-2">
           {module.intendedFeatures.map((feature) => (
             <li key={feature}>{feature}</li>
           ))}
