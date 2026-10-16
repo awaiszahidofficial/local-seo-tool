@@ -26,6 +26,8 @@ export type ProjectRow = {
   /** Added by migration 20261019000000 (Service-Area Coverage); priority order. */
   service_areas?: string[]
   services?: string[]
+  /** Added by migration 20261021000000 (Search Console property for this project). */
+  gsc_property?: string | null
 }
 
 export type ProjectInsert = {
@@ -41,7 +43,7 @@ export type ProjectInsert = {
   updated_at?: string
 }
 
-export type ProjectUpdate = Partial<ProjectInsert> & { service_areas?: string[]; services?: string[] }
+export type ProjectUpdate = Partial<ProjectInsert> & { service_areas?: string[]; services?: string[]; gsc_property?: string | null }
 
 export type CrawlStatus = 'running' | 'completed' | 'failed'
 export type CrawlStopReason = 'completed' | 'page_limit' | 'time_limit' | 'blocked_by_robots'

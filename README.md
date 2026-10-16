@@ -2,7 +2,7 @@
 
 Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local business owners who manage local SEO work across several client websites. The long-term goal is to audit sites, analyse Google Business Profiles, find local ranking opportunities, monitor Search Console data, track listings and generate reports.
 
-**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor), Phase 4 (Service-Area Coverage) and Phase 5 (Google Business Profile Audit).** Auth, project management, the crawler, the auditor, service-area coverage and the Business Profile audit are real and working; the other SEO analysis modules are still planned.
+**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor), Phase 4 (Service-Area Coverage), Phase 5 (Google Business Profile Audit) and Phase 6 (Google Search Console).** Auth, project management, the crawler, the auditor, service-area coverage, the Business Profile audit and the Search Console integration are real and working; the other SEO analysis modules are still planned.
 
 ## What Phase 1 implements
 
@@ -129,9 +129,54 @@ Google removed Q&A from Business Profiles, so it is not part of the audit.
 - Data is entered by hand, so the audit is only as current as the last update. Thresholds (for example 25 reviews, 10 photos, a post every 30 days) are general guidelines; strong local competition may need more.
 - Name, phone and address comparisons with the website use the latest crawl (phone numbers, structured data and `<address>` text); addresses are compared on street number and street name.
 
+## What Phase 6 adds: Google Search Console
+
+Connect a Google account once (read-only access), link each project to one of its Search Console properties, and see for the last 7, 28 or 90 days, compared with the period before:
+
+- clicks, impressions, average CTR and average position, with changes
+- **Local searches:** queries naming one of the project's service areas (or its location), plus "near me" searches, and their share of clicks
+- **Almost on top:** queries averaging positions 4–20 with real demand
+- **Ranking well, but few clicks:** top-5 queries with a CTR under half of what that position usually earns
+- biggest gains and losses, top queries (up to 1,000) and top pages
+
+How it works: a new Edge Function, `supabase/functions/gsc`, holds the Google client secret, runs the OAuth exchange and calls the Search Console API. Google tokens are encrypted (AES-GCM) and stored in `gsc_connections`, a table only the service role can read. The browser never sees them. Data is fetched live each time (nothing is copied into the database).
+
+### Set up Phase 6
+
+**1. Google Cloud (once, about 15 minutes)** at https://console.cloud.google.com
+
+1. Create a project (or pick one), e.g. "Local SEO Workbench".
+2. **APIs & Services → Library**: search for **Google Search Console API** and click **Enable**.
+3. **Google Auth Platform** (or **OAuth consent screen**): choose **External**, enter an app name and your email, and save.
+   - Under **Data access** (Scopes), add `https://www.googleapis.com/auth/webmasters.readonly`.
+   - Under **Audience**, click **Publish app** so it is **In production**. In "Testing" mode Google expires the connection every 7 days. An unverified app works for your own accounts; Google shows an "unverified app" warning you can click through (Advanced → Go to app).
+4. **Clients** (or **Credentials → Create credentials → OAuth client ID**): type **Web application**. Under **Authorized redirect URIs** add both:
+   - `https://<your-vercel-domain>/search-console/callback`
+   - `http://localhost:5173/search-console/callback`
+   Save, then copy the **Client ID** and **Client secret**.
+
+**2. Supabase**
+
+1. Run the seventh migration in the SQL Editor: `supabase/migrations/20261021000000_search_console.sql`.
+2. Set the secrets and deploy the new function (in the project folder):
+
+   ```bash
+   npx supabase secrets set GOOGLE_CLIENT_ID=<client id> GOOGLE_CLIENT_SECRET=<client secret> GSC_REDIRECT_URIS=https://<your-vercel-domain>/search-console/callback,http://localhost:5173/search-console/callback
+   npx supabase functions deploy gsc
+   ```
+
+**3.** Push to GitHub so Vercel redeploys, open **Google Search Console**, click **Connect Google Search Console**, then choose a project and its property.
+
+### Search Console limitations
+
+- Google reports data about 3 days late and hides very rare queries for privacy, so query totals are lower than the headline totals.
+- Up to 1,000 queries and 1,000 pages are loaded per period; web search only (not image, video or news).
+- One Google connection per app user. If the client's property is under a different Google account, ask the client to add your account as a user in Search Console.
+- If the Google connection is revoked or expires, the page asks you to connect again.
+
 ## Still planned (not implemented)
 
-Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No Google integration, AI recommendations or reporting exist yet.
+Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No AI recommendations or reporting exist yet.
 
 ## Prerequisites
 

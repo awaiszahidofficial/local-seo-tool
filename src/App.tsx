@@ -11,6 +11,8 @@ import { SignUpPage } from './pages/auth/SignUpPage'
 import { LocalAuditorPage } from './pages/LocalAuditorPage'
 import { ServiceAreaPage } from './pages/ServiceAreaPage'
 import { GbpAuditPage } from './pages/GbpAuditPage'
+import { SearchConsoleCallbackPage } from './pages/SearchConsoleCallbackPage'
+import { SearchConsolePage } from './pages/SearchConsolePage'
 import { ModulePage } from './pages/ModulePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OverviewPage } from './pages/OverviewPage'
@@ -45,6 +47,8 @@ export default function App() {
               <Route path="page-auditor" element={<LocalAuditorPage />} />
               <Route path="service-area" element={<ServiceAreaPage />} />
               <Route path="gbp-audit" element={<GbpAuditPage />} />
+              <Route path="search-console" element={<SearchConsolePage />} />
+              <Route path="search-console/callback" element={<SearchConsoleCallbackPage />} />
               <Route path="modules/:moduleId" element={<ModulePage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

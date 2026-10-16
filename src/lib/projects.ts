@@ -113,3 +113,23 @@ export function updateCoverageLists(
     return { data, error: null }
   })
 }
+
+/** Saves the Search Console property chosen for a project (null clears it). */
+export function updateGscProperty(id: string, property: string | null): Promise<DataResult<ProjectRow>> {
+  if (!isUuid(id)) return Promise.resolve({ data: null, error: NOT_FOUND_MESSAGE })
+  return guard(async () => {
+    const { data, error } = await supabase.from('projects').update({ gsc_property: property }).eq('id', id).select().maybeSingle()
+    if (error) {
+      const record = error as { code?: unknown; message?: unknown }
+      if (record.code === '42703' || record.code === 'PGRST204' || String(record.message ?? '').includes('gsc_property')) {
+        return {
+          data: null,
+          error: 'The property cannot be saved yet. Run the 20261021000000_search_console.sql migration in Supabase, then try again.',
+        }
+      }
+      return { data: null, error: getDatabaseErrorMessage(error) }
+    }
+    if (!data) return { data: null, error: NOT_FOUND_MESSAGE }
+    return { data, error: null }
+  })
+}

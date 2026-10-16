@@ -136,6 +136,7 @@ export const IMPLEMENTED_MODULE_PATHS: Readonly<Partial<Record<ModuleId, string>
   'page-auditor': '/page-auditor',
   'service-area': '/service-area',
   'gbp-audit': '/gbp-audit',
+  'search-console': '/search-console',
 }
 
 export function getImplementedPath(id: ModuleId): string | null {
