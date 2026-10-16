@@ -134,6 +134,7 @@ export function modulePath(id: ModuleId): string {
 export const IMPLEMENTED_MODULE_PATHS: Readonly<Partial<Record<ModuleId, string>>> = {
   crawler: '/crawler',
   'page-auditor': '/page-auditor',
+  'service-area': '/service-area',
 }
 
 export function getImplementedPath(id: ModuleId): string | null {

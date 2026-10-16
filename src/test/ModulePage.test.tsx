@@ -11,12 +11,13 @@ function renderAt(path: string) {
         <Route path="/modules/:moduleId" element={<ModulePage />} />
         <Route path="/crawler" element={<h1>Crawler page</h1>} />
         <Route path="/page-auditor" element={<h1>Auditor page</h1>} />
+        <Route path="/service-area" element={<h1>Coverage page</h1>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
-// Built modules (Phase 2 crawler, Phase 3 auditor) have real pages; the rest are placeholders.
+// Built modules (Phase 2 crawler, Phase 3 auditor, Phase 4 service areas) have real pages; the rest are placeholders.
 const PLACEHOLDER_IDS = MODULE_IDS.filter((id) => getImplementedPath(id) === null)
 
 describe('ModulePage', () => {
@@ -31,8 +32,13 @@ describe('ModulePage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Auditor page' })).toBeInTheDocument()
   })
 
+  it('redirects the service-area placeholder to the coverage page', () => {
+    renderAt('/modules/service-area')
+    expect(screen.getByRole('heading', { level: 1, name: 'Coverage page' })).toBeInTheDocument()
+  })
+
   it('keeps placeholders for every module that is not built yet', () => {
-    expect(PLACEHOLDER_IDS).toEqual(['service-area', 'gbp-audit', 'search-console', 'listings', 'keywords', 'recommendations', 'reports'])
+    expect(PLACEHOLDER_IDS).toEqual(['gbp-audit', 'search-console', 'listings', 'keywords', 'recommendations', 'reports'])
   })
 
   it.each(PLACEHOLDER_IDS)('renders the %s placeholder with the correct name and a not-implemented notice', (id) => {

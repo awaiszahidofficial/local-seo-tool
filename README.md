@@ -2,7 +2,7 @@
 
 Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local business owners who manage local SEO work across several client websites. The long-term goal is to audit sites, analyse Google Business Profiles, find local ranking opportunities, monitor Search Console data, track listings and generate reports.
 
-**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler) and Phase 3 (Local Page Auditor).** Auth, project management, the crawler and the auditor are real and working; the other SEO analysis modules are still planned.
+**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor) and Phase 4 (Service-Area Coverage).** Auth, project management, the crawler, the auditor and service-area coverage are real and working; the other SEO analysis modules are still planned.
 
 ## What Phase 1 implements
 
@@ -85,9 +85,34 @@ Do the steps in this order. Without the migration, a new crawl stops with a mess
 - Phone numbers are detected from text and `tel:` links with a pattern that may miss unusual formats or pick up number-like text. Addresses are detected only from an `<address>` element or structured data.
 - Review markup, opening hours, Google Business Profile consistency and citations are not checked yet (later modules).
 
+
+## What Phase 4 adds: Service-Area Coverage
+
+List the cities or neighbourhoods a business serves (most important first) and its services, and the page compares them with the latest crawl:
+
+- **Area by area:** whether each area has a dedicated page (the area in the page address, or in both its title and H1), only mentions on other pages, or nothing at all. For the best page per area it checks: area in title and H1, noindex, thin content (under 300 words), how often the area is mentioned, whether a service is named, whether any other page links to it, and several pages competing for one area.
+- **Near-duplicate area pages:** pages that are 80%+ the same once city names are ignored (the "city-swap" doorway pattern).
+- **Services by area grid:** which service + area combinations have a page naming both.
+- **Pages to create next:** gaps in the order of your list, with a suggested URL (following the folder your existing area pages use) and title.
+- **Suggestions from the site:** place names found in folders such as `/service-areas/` or `/locations/` that are not on your list yet, with one-click add.
+
+Without a saved list the project's primary location is used; without services, the business type is used. Everything runs in the browser from stored crawl data.
+
+### Set up Phase 4
+
+1. **Apply the fifth migration** in the Supabase SQL Editor: `supabase/migrations/20261019000000_service_areas.sql`. It adds the `service_areas` and `services` lists to projects (existing RLS covers them).
+2. Push to GitHub so Vercel redeploys. No Edge Function change is needed.
+3. Open **Service-Area Coverage**, choose a project, enter the areas and services, and click **Save lists**.
+
+### Coverage limitations
+
+- Matching is by name: an area page that never names the area in its address, title or H1 is not recognised as dedicated, and spelling variants other than St/Saint, Mt/Mount and Ft/Fort are not merged.
+- Internal links are counted from the first 40 links stored per page, so "nothing links to it" can be a false alarm on link-heavy sites.
+- Duplicate detection compares page text as stored (up to 12,000 characters of main content per page).
+
 ## Still planned (not implemented)
 
-Service-Area Coverage, Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No Google integration, AI recommendations or reporting exist yet.
+Google Business Profile Audit, Google Search Console, Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No Google integration, AI recommendations or reporting exist yet.
 
 ## Prerequisites
 

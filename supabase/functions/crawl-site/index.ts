@@ -12,7 +12,7 @@
 // SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase
 // into every Edge Function. They are never sent to the browser.
 
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import {
   applyDuplicateIssues,
   beginCrawl,
@@ -67,8 +67,8 @@ async function hostResolvesPublicly(hostname: string): Promise<boolean> {
   }
 }
 
-// deno-lint-ignore no-explicit-any
-type Admin = any
+/** Service-role client (no generated database types, so rows are untyped). */
+type Admin = SupabaseClient
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []
@@ -269,7 +269,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Writes use the service role, only after ownership was verified above.
-  const admin: Admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
   // ---- Continue an existing crawl ------------------------------------------------------------
   if (typeof crawlId === 'string') {

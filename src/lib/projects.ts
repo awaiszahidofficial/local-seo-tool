@@ -84,3 +84,32 @@ export function deleteProject(id: string): Promise<DataResult<{ id: string }>> {
     return { data: { id }, error: null }
   })
 }
+
+const MISSING_COVERAGE_COLUMNS =
+  'Service areas cannot be saved yet. Run the 20261019000000_service_areas.sql migration in Supabase, then try again.'
+
+/** Saves a project's service areas and services (Service-Area Coverage). Lists are stored as given. */
+export function updateCoverageLists(
+  id: string,
+  lists: { service_areas: string[]; services: string[] },
+): Promise<DataResult<ProjectRow>> {
+  if (!isUuid(id)) return Promise.resolve({ data: null, error: NOT_FOUND_MESSAGE })
+  return guard(async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ service_areas: lists.service_areas, services: lists.services })
+      .eq('id', id)
+      .select()
+      .maybeSingle()
+    if (error) {
+      const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
+      const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : ''
+      if (code === '42703' || code === 'PGRST204' || /service_areas|services/.test(message)) {
+        return { data: null, error: MISSING_COVERAGE_COLUMNS }
+      }
+      return { data: null, error: getDatabaseErrorMessage(error) }
+    }
+    if (!data) return { data: null, error: NOT_FOUND_MESSAGE }
+    return { data, error: null }
+  })
+}

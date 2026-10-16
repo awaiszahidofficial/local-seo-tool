@@ -14,7 +14,7 @@ import { Table, Td, Th } from '../components/ui/Table'
 import { controlClasses } from '../components/ui/fieldStyles'
 import { useLatestCrawl } from '../hooks/useLatestCrawl'
 import { useProjectList } from '../hooks/useProjectList'
-import { CRAWL_STALE_AFTER_MS, formatPageLimit } from '../../supabase/functions/_shared/limits.ts'
+import { formatPageLimit } from '../../supabase/functions/_shared/limits.ts'
 import { describeStopReason, filterPages, startCrawl, summarizeCrawl, type IssueFilter } from '../lib/crawls'
 import { formatDateTime } from '../lib/format'
 import { formatUrlForDisplay, getSafeHttpUrl } from '../lib/url'
@@ -284,11 +284,8 @@ export function CrawlerPage() {
                 ) : (
                   <Alert variant="info" title="This crawl did not finish">
                     {crawl.pages_crawled.toLocaleString('en-US')} pages were saved before it stopped (for example, the
-                    page was closed).{' '}
-                    {crawl.last_activity_at && Date.now() - Date.parse(crawl.last_activity_at) < CRAWL_STALE_AFTER_MS
-                      ? 'It may still be running in another tab. '
-                      : ''}
-                    Resume it to continue where it left off.
+                    page was closed). Resume it to continue where it left off. If it is still running in another
+                    tab, resuming waits for that tab.
                     <div className="mt-3">
                       <Button onClick={() => void handleStart(crawl.id)} disabled={running}>
                         Resume crawl

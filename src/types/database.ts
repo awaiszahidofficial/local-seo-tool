@@ -23,6 +23,9 @@ export type ProjectRow = {
   notes: string | null
   created_at: string
   updated_at: string
+  /** Added by migration 20261019000000 (Service-Area Coverage); priority order. */
+  service_areas?: string[]
+  services?: string[]
 }
 
 export type ProjectInsert = {
@@ -38,7 +41,7 @@ export type ProjectInsert = {
   updated_at?: string
 }
 
-export type ProjectUpdate = Partial<ProjectInsert>
+export type ProjectUpdate = Partial<ProjectInsert> & { service_areas?: string[]; services?: string[] }
 
 export type CrawlStatus = 'running' | 'completed' | 'failed'
 export type CrawlStopReason = 'completed' | 'page_limit' | 'time_limit' | 'blocked_by_robots'

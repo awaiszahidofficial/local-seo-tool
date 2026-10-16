@@ -9,6 +9,7 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { SignInPage } from './pages/auth/SignInPage'
 import { SignUpPage } from './pages/auth/SignUpPage'
 import { LocalAuditorPage } from './pages/LocalAuditorPage'
+import { ServiceAreaPage } from './pages/ServiceAreaPage'
 import { ModulePage } from './pages/ModulePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OverviewPage } from './pages/OverviewPage'
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="projects/:projectId/edit" element={<ProjectEditPage />} />
               <Route path="crawler" element={<CrawlerPage />} />
               <Route path="page-auditor" element={<LocalAuditorPage />} />
+              <Route path="service-area" element={<ServiceAreaPage />} />
               <Route path="modules/:moduleId" element={<ModulePage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
