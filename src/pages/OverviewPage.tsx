@@ -5,10 +5,9 @@ import { Card, CardHeader } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/Spinner'
 import { PageHeader } from '../components/ui/PageHeader'
-import { StatusBadge } from '../components/ui/StatusBadge'
 import { useProjectList } from '../hooks/useProjectList'
 import { formatDate } from '../lib/format'
-import { MODULE_IDS, MODULES, modulePath } from '../lib/modules'
+import { MODULE_IDS, MODULES, getImplementedPath, modulePath } from '../lib/modules'
 import { formatUrlForDisplay } from '../lib/url'
 
 export function OverviewPage() {
@@ -41,7 +40,7 @@ export function OverviewPage() {
         <Card>
           <EmptyState
             title="Create your first project"
-            description="A project represents one client website. Add its details to get started — analysis modules will build on projects in future phases."
+            description="A project represents one client website. Add its details to get started — every analysis module works on a project."
             action={<ButtonLink to="/projects/new">Create project</ButtonLink>}
           />
         </Card>
@@ -93,19 +92,14 @@ export function OverviewPage() {
         </div>
       ) : null}
 
-      <Card as="section" aria-labelledby="planned-modules" className="mt-6">
-        <CardHeader
-          id="planned-modules"
-          title="Analysis modules"
-          description="These modules are planned for future phases and are not available yet."
-        />
+      <Card as="section" aria-labelledby="analysis-modules" className="mt-6">
+        <CardHeader id="analysis-modules" title="Analysis modules" description="Pick a module, then choose a project inside it." />
         <ul className="grid gap-px bg-slate-100 sm:grid-cols-2">
           {MODULE_IDS.map((id) => (
             <li key={id} className="flex items-center justify-between gap-3 bg-white px-5 py-3">
-              <Link to={modulePath(id)} className="text-sm font-medium text-slate-800 hover:text-indigo-700 hover:underline">
+              <Link to={getImplementedPath(id) ?? modulePath(id)} className="text-sm font-medium text-slate-800 hover:text-indigo-700 hover:underline">
                 {MODULES[id].name}
               </Link>
-              <StatusBadge tone="planned">Planned</StatusBadge>
             </li>
           ))}
         </ul>

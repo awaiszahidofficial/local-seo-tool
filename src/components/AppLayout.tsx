@@ -114,7 +114,7 @@ export function AppLayout() {
   }, [drawerOpen])
 
   return (
-    <div className="min-h-screen lg:pl-72">
+    <div className="min-h-screen lg:pl-72 print:pl-0">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-indigo-700 focus:shadow-lg"
@@ -123,12 +123,12 @@ export function AppLayout() {
       </a>
 
       {/* Persistent sidebar on desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-200 bg-white lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-200 bg-white lg:block print:hidden">
         <SidebarContent />
       </aside>
 
       {/* Top bar + drawer on tablet and mobile */}
-      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden print:hidden">
         <button
           ref={menuButtonRef}
           type="button"
@@ -171,7 +171,7 @@ export function AppLayout() {
         </div>
       ) : null}
 
-      <main id="main-content" tabIndex={-1} className="px-4 py-8 focus:outline-none sm:px-6 lg:px-10">
+      <main id="main-content" tabIndex={-1} className="px-4 py-8 focus:outline-none sm:px-6 lg:px-10 print:p-0">
         <div className="mx-auto max-w-6xl">
           <Outlet />
         </div>

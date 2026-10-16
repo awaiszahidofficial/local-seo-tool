@@ -52,28 +52,24 @@ describe('sidebar navigation', () => {
     ])
   })
 
-  it('marks every module except the built ones (crawler, auditor, service areas, GBP audit, Search Console) as planned and links each to a known module', () => {
+  it('links every module to its built page; nothing is left as planned', () => {
     const items = NAV_GROUPS.flatMap((group) => group.items)
-    const planned = items.filter((item) => item.planned)
-    expect(planned).toHaveLength(Object.keys(MODULES).length - 5)
-    for (const item of planned) {
-      expect(item.to.startsWith('/modules/')).toBe(true)
-      expect(isModuleId(item.to.replace('/modules/', ''))).toBe(true)
+    expect(items.filter((item) => item.planned)).toEqual([])
+    const expected: Record<string, string> = {
+      'Website Crawler': '/crawler',
+      'Local Page Auditor': '/page-auditor',
+      'Service-Area Coverage': '/service-area',
+      'Google Business Profile Audit': '/gbp-audit',
+      'Google Search Console': '/search-console',
+      'Business Listings': '/listings',
+      'Keyword Opportunities': '/keywords',
+      Recommendations: '/recommendations',
+      Reports: '/reports',
     }
-    expect(items.filter((item) => !item.planned).map((item) => item.label)).toEqual([
-      'Overview',
-      'Projects',
-      'Website Crawler',
-      'Local Page Auditor',
-      'Service-Area Coverage',
-      'Google Business Profile Audit',
-      'Google Search Console',
-      'Settings',
-    ])
-    expect(items.find((item) => item.label === 'Website Crawler')).toMatchObject({ to: '/crawler', planned: false })
-    expect(items.find((item) => item.label === 'Local Page Auditor')).toMatchObject({ to: '/page-auditor', planned: false })
-    expect(items.find((item) => item.label === 'Service-Area Coverage')).toMatchObject({ to: '/service-area', planned: false })
-    expect(items.find((item) => item.label === 'Google Business Profile Audit')).toMatchObject({ to: '/gbp-audit', planned: false })
-    expect(items.find((item) => item.label === 'Google Search Console')).toMatchObject({ to: '/search-console', planned: false })
+    for (const [label, to] of Object.entries(expected)) {
+      expect(items.find((item) => item.label === label)).toMatchObject({ to, planned: false })
+    }
+    expect(Object.keys(expected)).toHaveLength(Object.keys(MODULES).length)
+    expect(isModuleId('reports')).toBe(true)
   })
 })

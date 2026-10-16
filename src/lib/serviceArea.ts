@@ -136,12 +136,12 @@ function segmentHasSlug(segment: string, slug: string): boolean {
   return at !== -1
 }
 
-function urlMatchesArea(url: string, area: AreaMatcher): boolean {
+export function urlMatchesArea(url: string, area: AreaMatcher): boolean {
   const segments = segmentsOf(url)
   return segments.some((segment) => area.slugs.some((slug) => segmentHasSlug(segment, slug)))
 }
 
-function textMatchesArea(text: string | null | undefined, area: AreaMatcher): boolean {
+export function textMatchesArea(text: string | null | undefined, area: AreaMatcher): boolean {
   return countTerms(text, area.terms) > 0
 }
 
@@ -149,7 +149,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function matchesService(text: string | null | undefined, service: ServiceMatcher): boolean {
+export function matchesService(text: string | null | undefined, service: ServiceMatcher): boolean {
   if (!text) return false
   const lower = text.toLowerCase()
   if (service.terms.some((term) => term.length >= 3 && lower.includes(term))) return true
@@ -158,12 +158,12 @@ function matchesService(text: string | null | undefined, service: ServiceMatcher
   return service.stems.every((s) => new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(s)}`, 'iu').test(lower))
 }
 
-function urlMatchesService(url: string, service: ServiceMatcher): boolean {
+export function urlMatchesService(url: string, service: ServiceMatcher): boolean {
   const path = segmentsOf(url).join(' ').replace(/-/g, ' ')
   return matchesService(path, service)
 }
 
-function isUsable(page: CoveragePage): boolean {
+export function isUsable(page: CoveragePage): boolean {
   return page.error === null && page.status_code !== null && page.status_code >= 200 && page.status_code < 300
 }
 
@@ -309,7 +309,7 @@ function commonAreaPrefix(urls: readonly string[]): string {
   return best === '/' ? '/service-areas/' : best
 }
 
-function titleCase(value: string): string {
+export function titleCase(value: string): string {
   return value.replace(/\b\p{L}/gu, (letter) => letter.toUpperCase())
 }
 

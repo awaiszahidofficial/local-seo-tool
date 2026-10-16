@@ -133,6 +133,46 @@ export type GbpProfileRow = {
 /** Everything the user can write (ids and timestamps are set by the database). */
 export type GbpProfileInput = Omit<GbpProfileRow, 'user_id' | 'created_at' | 'updated_at'>
 
+export type ListingStatus = 'live' | 'needs_update' | 'pending' | 'not_listed' | 'duplicate'
+
+/** A directory / citation listing tracked for a project (migration 20261022000000). */
+export type BusinessListingRow = {
+  id: string
+  project_id: string
+  user_id: string
+  directory: string
+  listing_url: string | null
+  status: ListingStatus
+  name: string | null
+  address: string | null
+  phone: string | null
+  website: string | null
+  notes: string | null
+  last_checked: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type BusinessListingInput = Omit<BusinessListingRow, 'id' | 'project_id' | 'user_id' | 'created_at' | 'updated_at'>
+
+export type RecommendationStateRow = {
+  project_id: string
+  rec_key: string
+  user_id: string
+  status: 'done' | 'dismissed'
+  updated_at: string
+}
+
+export type ReportRow = {
+  id: string
+  project_id: string
+  user_id: string
+  title: string
+  /** A ReportSnapshot (src/lib/reportSnapshot.ts) stored as JSON. */
+  snapshot: unknown
+  created_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -169,6 +209,24 @@ export type Database = {
       crawl_pages: {
         Row: CrawlPageRow
         Insert: never
+        Update: never
+        Relationships: []
+      }
+      business_listings: {
+        Row: BusinessListingRow
+        Insert: BusinessListingInput & { project_id: string; user_id?: string }
+        Update: Partial<BusinessListingInput>
+        Relationships: []
+      }
+      recommendation_states: {
+        Row: RecommendationStateRow
+        Insert: { project_id: string; rec_key: string; status: 'done' | 'dismissed'; user_id?: string }
+        Update: { status?: 'done' | 'dismissed' }
+        Relationships: []
+      }
+      reports: {
+        Row: ReportRow
+        Insert: { project_id: string; title: string; snapshot: unknown; user_id?: string }
         Update: never
         Relationships: []
       }

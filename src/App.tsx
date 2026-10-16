@@ -13,6 +13,11 @@ import { ServiceAreaPage } from './pages/ServiceAreaPage'
 import { GbpAuditPage } from './pages/GbpAuditPage'
 import { SearchConsoleCallbackPage } from './pages/SearchConsoleCallbackPage'
 import { SearchConsolePage } from './pages/SearchConsolePage'
+import { KeywordsPage } from './pages/KeywordsPage'
+import { ListingsPage } from './pages/ListingsPage'
+import { RecommendationsPage } from './pages/RecommendationsPage'
+import { ReportViewPage } from './pages/ReportViewPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { ModulePage } from './pages/ModulePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { OverviewPage } from './pages/OverviewPage'
@@ -49,6 +54,11 @@ export default function App() {
               <Route path="gbp-audit" element={<GbpAuditPage />} />
               <Route path="search-console" element={<SearchConsolePage />} />
               <Route path="search-console/callback" element={<SearchConsoleCallbackPage />} />
+              <Route path="listings" element={<ListingsPage />} />
+              <Route path="keywords" element={<KeywordsPage />} />
+              <Route path="recommendations" element={<RecommendationsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="reports/:reportId" element={<ReportViewPage />} />
               <Route path="modules/:moduleId" element={<ModulePage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

@@ -2,7 +2,7 @@
 
 Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local business owners who manage local SEO work across several client websites. The long-term goal is to audit sites, analyse Google Business Profiles, find local ranking opportunities, monitor Search Console data, track listings and generate reports.
 
-**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor), Phase 4 (Service-Area Coverage), Phase 5 (Google Business Profile Audit) and Phase 6 (Google Search Console).** Auth, project management, the crawler, the auditor, service-area coverage, the Business Profile audit and the Search Console integration are real and working; the other SEO analysis modules are still planned.
+**This repository contains Phase 1 (application foundation), Phase 2 (Website Crawler), Phase 3 (Local Page Auditor), Phase 4 (Service-Area Coverage), Phase 5 (Google Business Profile Audit), Phase 6 (Google Search Console) and Phases 7–10 (Business Listings, Keyword Opportunities, Recommendations, Reports).** Every module in the sidebar is built and working; the other SEO analysis modules are still planned.
 
 ## What Phase 1 implements
 
@@ -174,9 +174,30 @@ How it works: a new Edge Function, `supabase/functions/gsc`, holds the Google cl
 - One Google connection per app user. If the client's property is under a different Google account, ask the client to add your account as a user in Search Console.
 - If the Google connection is revoked or expires, the page asks you to connect again.
 
-## Still planned (not implemented)
+## What Phases 7–10 add
 
-Business Listings, Keyword Opportunities, Recommendations and Reports. These appear in the sidebar labelled as planned and do nothing yet. No AI recommendations or reporting exist yet.
+### Business Listings
+Track every directory a business is listed on (status, listing URL, last checked, notes) and record the name, address, phone and website exactly as each listing shows them. Each listing is compared with the correct details (from the Business Profile details, else the project) and every field is marked as matching or different. Formatting differences are ignored (LLC, punctuation, phone format, www, "St" vs "Street"). The page lists the essential directories not yet recorded (Google, Bing, Apple, Facebook, Yelp) with one-click add, plus a list of other useful directories.
+
+### Keyword Opportunities
+Builds the searches local customers make from the project's services and service areas ("[service] [city]", "[service] near me", plus optional "best", "cost" and "emergency" variants), finds the page that targets each one, and, with Search Console connected, shows the average position, impressions and clicks of the matching searches over 90 days. Each keyword gets a next step: create a page, improve the page, push into the top 3, or keep. It also lists local searches people already find the site for that the list does not cover. Download as CSV. Search volumes are not included (no paid keyword API), so check them in a keyword tool.
+
+### Recommendations
+One prioritised to-do list per project, built from every module: crawl issues, failing local-page checks, missing or weak service-area pages, services without a page, Business Profile fixes, inconsistent or missing listings, and Search Console opportunities, plus setup gaps (no crawl, no areas, no profile details, Search Console not connected). Ranked by impact, then effort. Mark items done or dismissed. Their keys are stable, so the state survives re-crawls.
+
+### Reports
+Create a client report for a project: a frozen snapshot of priorities, Google Search performance (if connected), Business Profile, website health and local signals, service-area coverage and listings. Saved reports never change, so you can compare month to month. Open a report and use **Print or save as PDF** (the sidebar is hidden when printing).
+
+### Set up Phases 7–10
+
+1. **Apply the eighth migration** in the Supabase SQL Editor: `supabase/migrations/20261022000000_listings_recommendations_reports.sql` (tables `business_listings`, `recommendation_states`, `reports`, all owner-only RLS).
+2. Push to GitHub so Vercel redeploys. No Edge Function change is needed.
+
+### Limitations of Phases 7–10
+
+- Listings are recorded by hand; the app does not scan directories.
+- Keyword ideas come from your service and area lists; no search-volume or difficulty data.
+- Recommendations and reports are only as complete as the data in the other modules; missing pieces show as setup recommendations or "not included" in the report.
 
 ## Prerequisites
 
