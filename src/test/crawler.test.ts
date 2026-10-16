@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyDuplicateIssues,
+  beginCrawl,
   crawlSite,
+  crawlStep,
+  DEFAULT_LIMITS,
+  isCrawlState,
   decodeEntities,
   extractPage,
   isBlockedHostname,
@@ -618,5 +623,135 @@ describe('crawlSite stores local signals', () => {
     expect(page?.schema_local).toBeNull()
     expect(page?.body_text).toBeNull()
     expect(page?.link_paths).toEqual([])
+  })
+})
+
+describe('resumable crawl in slices', () => {
+  const start = new URL('https://example.com/')
+  const ok = { title: GOOD_TITLE, description: GOOD_DESC, h1: 'Heading' }
+
+  function siteWith(count: number): Record<string, Route> {
+    const links = Array.from({ length: count - 1 }, (_, i) => `/p${i + 1}`)
+    const routes: Record<string, Route> = { 'https://example.com/': { body: html({ ...ok, links }) } }
+    for (const [i, path] of links.entries()) {
+      // every page links back to two others, so de-duplication across slices matters
+      routes[`https://example.com${path}`] = {
+        body: html({ ...ok, title: `${GOOD_TITLE} ${i}`, description: `${GOOD_DESC} ${i}`, links: ['/', links[(i + 1) % links.length] ?? '/'] }),
+      }
+    }
+    return routes
+  }
+
+  it('defaults to a 1,000-page limit with 5 pages at a time', () => {
+    expect(DEFAULT_LIMITS.maxPages).toBe(1000)
+    expect(DEFAULT_LIMITS.concurrency).toBe(5)
+  })
+
+  it('crawls the same pages in several slices as in one go, without repeats', async () => {
+    const routes = siteWith(23)
+    const whole = await crawlSite({ startUrl: start, fetcher: makeFetcher(routes) })
+
+    const log: string[] = []
+    const fetcher = makeFetcher(routes, log)
+    let state = await beginCrawl({ startUrl: start, fetcher })
+    expect(state).not.toBeNull()
+    const urls: string[] = []
+    let slices = 0
+    for (;;) {
+      slices += 1
+      // round-trip through JSON, as the Edge Function stores state in the database between calls
+      const step = await crawlStep({ startUrl: start, fetcher, state: JSON.parse(JSON.stringify(state)), deadline: Infinity, stepMaxPages: 5 })
+      urls.push(...step.pages.map((p) => p.url))
+      state = step.state
+      if (step.outcome !== 'slice_end') {
+        expect(step.outcome).toBe('completed')
+        break
+      }
+    }
+
+    expect(slices).toBe(5)
+    expect(urls).toEqual(whole.pages.map((p) => p.url))
+    expect(new Set(urls).size).toBe(23)
+    expect(log.filter((u) => u === 'https://example.com/p3')).toHaveLength(1)
+  })
+
+  it('stops at the total page limit across slices', async () => {
+    const routes = siteWith(30)
+    const fetcher = makeFetcher(routes)
+    let state = await beginCrawl({ startUrl: start, fetcher })
+    let total = 0
+    let outcome = 'slice_end'
+    while (state && outcome === 'slice_end') {
+      const step = await crawlStep({ startUrl: start, fetcher, state, deadline: Infinity, stepMaxPages: 4, limits: { maxPages: 10 } })
+      total += step.pages.length
+      outcome = step.outcome
+      state = step.state
+    }
+    expect(total).toBe(10)
+    expect(outcome).toBe('page_limit')
+  })
+
+  it('ends a slice at its deadline and keeps the rest of the queue', async () => {
+    let clock = 0
+    const base = makeFetcher(siteWith(12))
+    const fetcher: Fetcher = async (url, init) => {
+      clock += 10_000
+      return base(url, init)
+    }
+    const state = await beginCrawl({ startUrl: start, fetcher, now: () => clock })
+    if (!state) throw new Error('expected state')
+    const step = await crawlStep({ startUrl: start, fetcher, now: () => clock, state, deadline: clock + 25_000, limits: { concurrency: 1 } })
+    expect(step.outcome).toBe('slice_end')
+    expect(step.pages.length).toBeGreaterThan(0)
+    expect(step.pages.length).toBeLessThan(12)
+    expect(step.state.queue.length).toBeGreaterThan(0)
+  })
+
+  it('returns null from beginCrawl when robots.txt blocks the start page', async () => {
+    const fetcher = makeFetcher({ 'https://example.com/robots.txt': { body: 'User-agent: *\nDisallow: /', type: 'text/plain' } })
+    expect(await beginCrawl({ startUrl: start, fetcher })).toBeNull()
+  })
+
+  it('validates stored state', () => {
+    expect(isCrawlState({ v: 1, queue: [], seen: [], robots: { allow: [], disallow: [] }, scheduled: 0, skippedByRobots: 0 })).toBe(true)
+    expect(isCrawlState({ v: 2 })).toBe(false)
+    expect(isCrawlState(null)).toBe(false)
+    expect(isCrawlState({ v: 1, queue: 'x', seen: [], robots: { allow: [], disallow: [] }, scheduled: 0, skippedByRobots: 0 })).toBe(false)
+  })
+
+  it('ignores queued URLs from other sites in tampered state', async () => {
+    const log: string[] = []
+    const fetcher = makeFetcher({}, log)
+    await crawlStep({
+      startUrl: start,
+      fetcher,
+      state: { v: 1, queue: [{ u: 'https://evil.example/', d: 1 }, { u: 'http://127.0.0.1/', d: 1 }], seen: [], robots: { allow: [], disallow: [] }, scheduled: 0, skippedByRobots: 0 },
+      deadline: Infinity,
+    })
+    expect(log).toEqual([])
+  })
+
+  it('adds duplicate issues across pages from different slices', () => {
+    let n = 0
+    const page = (title: string, extra: Partial<{ status_code: number | null; error: string | null; issues: string[] }> = {}) => ({
+      title,
+      meta_description: `Unique description ${(n += 1)}`,
+      status_code: 200,
+      error: null,
+      issues: ['missing_canonical'],
+      ...extra,
+    })
+    const updated = applyDuplicateIssues([
+      page('Same title'),
+      page('Other'),
+      page('same title '),
+      page('Same title', { status_code: 404, issues: ['http_error'] }),
+    ])
+    expect(updated[0]).toEqual(['duplicate_title', 'missing_canonical'])
+    expect(updated[1]).toBeNull()
+    expect(updated[2]).toEqual(['duplicate_title', 'missing_canonical'])
+    expect(updated[3]).toBeNull() // broken pages are not compared
+    // already flagged pages are left alone
+    expect(applyDuplicateIssues([page('A', { issues: ['duplicate_title'] }), page('A', { issues: ['duplicate_title'] })])).toEqual([null, null])
   })
 })

@@ -1,4 +1,5 @@
 import { ISSUE_CODES, ISSUE_META, isIssueCode, type IssueCode, type IssueSeverity } from '../../supabase/functions/_shared/issues.ts'
+import { CRAWL_MAX_PAGES, formatPageLimit } from '../../supabase/functions/_shared/limits.ts'
 import type { CrawlPageRow, CrawlRow } from '../types/database'
 import { getDatabaseErrorMessage } from './errors'
 import { isUuid, type DataResult } from './projects'
@@ -36,18 +37,70 @@ export async function getCrawlErrorMessage(error: unknown): Promise<string> {
 
 export type StartCrawlResult = { crawlId: string; pagesCrawled: number }
 
-/** Runs a crawl for a project via the crawl-site Edge Function (the server enforces ownership). */
-export async function startCrawl(projectId: string): Promise<DataResult<StartCrawlResult>> {
+export type StartCrawlOptions = {
+  /** Continue (resume) this crawl instead of starting a new one. */
+  crawlId?: string
+  /** Called after every slice with the crawl id and the number of pages saved so far. */
+  onProgress?: (progress: StartCrawlResult) => void
+}
+
+/** Safety stop for the slice loop: 1,000 pages at 80 per slice needs about 13 calls. */
+const MAX_SLICES = 60
+/** Retries for one failed slice call (network blips); the server's lock keeps retries safe. */
+const SLICE_RETRIES = 2
+
+type SliceResponse = { crawlId: string; status: 'running' | 'completed'; pagesCrawled: number }
+
+async function invokeSlice(projectId: string, crawlId: string | undefined): Promise<DataResult<SliceResponse>> {
+  const body = crawlId ? { projectId, crawlId } : { projectId }
+  const { data, error } = await supabase.functions.invoke('crawl-site', { body })
+  if (error) return { data: null, error: await getCrawlErrorMessage(error) }
+  const result = data as { crawlId?: unknown; pagesCrawled?: unknown; status?: unknown } | null
+  if (!result || typeof result.crawlId !== 'string') return { data: null, error: GENERIC_CRAWL_ERROR }
+  return {
+    data: {
+      crawlId: result.crawlId,
+      status: result.status === 'running' ? 'running' : 'completed',
+      pagesCrawled: typeof result.pagesCrawled === 'number' ? result.pagesCrawled : 0,
+    },
+    error: null,
+  }
+}
+
+/**
+ * Runs a crawl for a project via the crawl-site Edge Function (the server enforces ownership).
+ * Large crawls come back in slices of about a minute each; this keeps calling until the server
+ * reports the crawl as completed. Pass `crawlId` to resume a crawl that was interrupted.
+ */
+export async function startCrawl(
+  projectId: string,
+  options: StartCrawlOptions = {},
+): Promise<DataResult<StartCrawlResult>> {
   if (!isUuid(projectId)) return { data: null, error: 'Choose a project first.' }
+  if (options.crawlId !== undefined && !isUuid(options.crawlId)) return { data: null, error: GENERIC_CRAWL_ERROR }
+  let crawlId = options.crawlId
   try {
-    const { data, error } = await supabase.functions.invoke('crawl-site', { body: { projectId } })
-    if (error) return { data: null, error: await getCrawlErrorMessage(error) }
-    const result = data as { crawlId?: unknown; pagesCrawled?: unknown } | null
-    if (!result || typeof result.crawlId !== 'string') return { data: null, error: GENERIC_CRAWL_ERROR }
-    return {
-      data: { crawlId: result.crawlId, pagesCrawled: typeof result.pagesCrawled === 'number' ? result.pagesCrawled : 0 },
-      error: null,
+    for (let slice = 0; slice < MAX_SLICES; slice += 1) {
+      let result = await invokeSlice(projectId, crawlId)
+      // A failed *continuation* may be a dropped connection; retry it. Never retry a fresh start,
+      // which could create a second crawl.
+      for (let attempt = 0; result.error !== null && crawlId !== undefined && attempt < SLICE_RETRIES; attempt += 1) {
+        result = await invokeSlice(projectId, crawlId)
+      }
+      if (result.data === null) {
+        const error =
+          crawlId !== undefined
+            ? `${result.error ?? GENERIC_CRAWL_ERROR} Pages found so far are saved; you can resume the crawl.`
+            : result.error
+        return { data: null, error }
+      }
+      crawlId = result.data.crawlId
+      options.onProgress?.({ crawlId, pagesCrawled: result.data.pagesCrawled })
+      if (result.data.status === 'completed') {
+        return { data: { crawlId, pagesCrawled: result.data.pagesCrawled }, error: null }
+      }
     }
+    return { data: null, error: 'The crawl is taking longer than expected. Pages found so far are saved; resume it to continue.' }
   } catch (error) {
     return { data: null, error: await getCrawlErrorMessage(error) }
   }
@@ -71,18 +124,40 @@ export async function getLatestCrawl(projectId: string): Promise<DataResult<Craw
   }
 }
 
-export async function listCrawlPages(crawlId: string): Promise<DataResult<CrawlPageRow[]>> {
+/** Every column except the long page text, for screens that do not need it. */
+const LIGHT_PAGE_COLUMNS =
+  'id, crawl_id, project_id, user_id, url, final_url, status_code, title, meta_description, h1, h1_count, ' +
+  'word_count, canonical_url, robots_meta, internal_links_count, response_time_ms, depth, issues, error, ' +
+  'created_at, h2s, phones, tel_links, schema_types, schema_local, has_map_embed, address_text, link_paths, local_version'
+
+/** Rows per request (Supabase returns at most 1000 per request by default). */
+const PAGE_BATCH = 500
+
+/**
+ * All pages of a crawl (up to the crawl limit), loaded in batches. With `light`, the long
+ * `body_text` column is skipped and returned as null.
+ */
+export async function listCrawlPages(
+  crawlId: string,
+  options: { light?: boolean } = {},
+): Promise<DataResult<CrawlPageRow[]>> {
   if (!isUuid(crawlId)) return { data: [], error: null }
   try {
-    const { data, error } = await supabase
-      .from('crawl_pages')
-      .select('*')
-      .eq('crawl_id', crawlId)
-      .order('depth', { ascending: true })
-      .order('url', { ascending: true })
-      .limit(200)
-    if (error) return { data: null, error: getDatabaseErrorMessage(error) }
-    return { data: data ?? [], error: null }
+    const pages: CrawlPageRow[] = []
+    for (let from = 0; from < CRAWL_MAX_PAGES; from += PAGE_BATCH) {
+      const { data, error } = await supabase
+        .from('crawl_pages')
+        .select(options.light ? LIGHT_PAGE_COLUMNS : '*')
+        .eq('crawl_id', crawlId)
+        .order('depth', { ascending: true })
+        .order('url', { ascending: true })
+        .range(from, Math.min(from + PAGE_BATCH, CRAWL_MAX_PAGES) - 1)
+      if (error) return { data: null, error: getDatabaseErrorMessage(error) }
+      const rows = (data ?? []) as unknown as CrawlPageRow[]
+      pages.push(...(options.light ? rows.map((row) => ({ ...row, body_text: null })) : rows))
+      if (rows.length < PAGE_BATCH) break
+    }
+    return { data: pages, error: null }
   } catch (error) {
     return { data: null, error: getDatabaseErrorMessage(error) }
   }
@@ -135,7 +210,7 @@ export function filterPages<T extends Pick<CrawlPageRow, 'issues'>>(pages: reado
 }
 
 const STOP_REASON_MESSAGES: Record<string, string> = {
-  page_limit: 'The crawl stopped at the 25-page limit, so the site may have more pages.',
+  page_limit: `The crawl stopped at the ${formatPageLimit()}-page limit, so the site may have more pages.`,
   time_limit: 'The crawl stopped because it ran out of time, so some pages were not checked.',
   blocked_by_robots: 'This site’s robots.txt asks crawlers not to visit the start page, so nothing was crawled.',
 }

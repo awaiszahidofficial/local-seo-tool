@@ -86,7 +86,7 @@ describe('CrawlerPage', () => {
     expect(within(summary).getByText('Pages crawled').nextElementSibling).toHaveTextContent('2')
     expect(within(summary).getByText('Pages with errors').nextElementSibling).toHaveTextContent('1')
     expect(within(summary).getByText('Pages with warnings').nextElementSibling).toHaveTextContent('1')
-    expect(screen.getByText(/stopped at the 25-page limit/i)).toBeInTheDocument()
+    expect(screen.getByText(/stopped at the 1,000-page limit/i)).toBeInTheDocument()
 
     const breakdown = screen.getByRole('heading', { name: 'Issues found' }).closest('section') as HTMLElement
     expect(within(breakdown).getByText('Returns an error status (4xx/5xx)')).toBeInTheDocument()
@@ -123,13 +123,57 @@ describe('CrawlerPage', () => {
     expect(screen.getByText('Crawl in progress')).toBeInTheDocument()
     await user.click(busy)
     expect(startCrawlMock).toHaveBeenCalledTimes(1)
-    expect(startCrawlMock).toHaveBeenCalledWith(PROJECT_ID)
+    expect(startCrawlMock).toHaveBeenCalledWith(PROJECT_ID, { onProgress: expect.any(Function) })
 
     const callsBefore = getLatestCrawlMock.mock.calls.length
     finish({ data: { crawlId: CRAWL_ID, pagesCrawled: 2 }, error: null })
 
     expect(await screen.findByText(/Crawl finished: 2 pages checked/)).toBeInTheDocument()
     await waitFor(() => expect(getLatestCrawlMock.mock.calls.length).toBeGreaterThan(callsBefore))
+  })
+
+  it('shows live progress while a large crawl runs in parts', async () => {
+    const user = userEvent.setup()
+    let finish: (value: unknown) => void = () => undefined
+    startCrawlMock.mockImplementation((_id: string, options: { onProgress: (p: { crawlId: string; pagesCrawled: number }) => void }) => {
+      options.onProgress({ crawlId: CRAWL_ID, pagesCrawled: 250 })
+      return new Promise((resolve) => (finish = resolve))
+    })
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /crawl again/i }))
+    expect(await screen.findByText(/250 pages so far/)).toBeInTheDocument()
+    finish({ data: { crawlId: CRAWL_ID, pagesCrawled: 1000 }, error: null })
+    expect(await screen.findByText(/Crawl finished: 1000 pages checked/)).toBeInTheDocument()
+  })
+
+  it('offers to resume a crawl that stopped part-way', async () => {
+    const user = userEvent.setup()
+    getLatestCrawlMock.mockResolvedValue({
+      data: { ...crawl, status: 'running', stopped_reason: null, pages_crawled: 480, last_activity_at: '2020-01-01T00:00:00Z' },
+      error: null,
+    })
+    startCrawlMock.mockResolvedValue({ data: { crawlId: CRAWL_ID, pagesCrawled: 1000 }, error: null })
+    renderPage()
+    expect(await screen.findByText('This crawl did not finish')).toBeInTheDocument()
+    expect(screen.getByText(/480 pages were saved/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Resume crawl' }))
+    expect(startCrawlMock).toHaveBeenCalledWith(PROJECT_ID, { crawlId: CRAWL_ID, onProgress: expect.any(Function) })
+  })
+
+  it('shows large page lists 100 rows at a time', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 250 }, (_, index) =>
+      page({ id: `page-${index}`, url: `https://acme.example/p${index}`, issues: [] }),
+    )
+    listCrawlPagesMock.mockResolvedValue({ data: many, error: null })
+    renderPage()
+    const table = await screen.findByRole('table', { name: 'Crawled pages' })
+    expect(within(table).getAllByRole('row')).toHaveLength(101)
+    expect(screen.getByText('Showing 100 of 250 pages')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
+    expect(within(table).getAllByRole('row')).toHaveLength(251)
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
   })
 
   it('shows the server error when the crawl fails', async () => {

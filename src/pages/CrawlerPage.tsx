@@ -14,6 +14,7 @@ import { Table, Td, Th } from '../components/ui/Table'
 import { controlClasses } from '../components/ui/fieldStyles'
 import { useLatestCrawl } from '../hooks/useLatestCrawl'
 import { useProjectList } from '../hooks/useProjectList'
+import { CRAWL_STALE_AFTER_MS, formatPageLimit } from '../../supabase/functions/_shared/limits.ts'
 import { describeStopReason, filterPages, startCrawl, summarizeCrawl, type IssueFilter } from '../lib/crawls'
 import { formatDateTime } from '../lib/format'
 import { formatUrlForDisplay, getSafeHttpUrl } from '../lib/url'
@@ -24,6 +25,9 @@ const SEVERITY_TONE: Record<'error' | 'warning' | 'info', BadgeTone> = {
   warning: 'warning',
   info: 'neutral',
 }
+
+/** Rows rendered at first; "Show more" adds this many again (1,000-row tables are slow to scroll). */
+const ROWS_STEP = 100
 
 const FILTER_LABELS: Record<IssueFilter, string> = {
   all: 'All pages',
@@ -95,29 +99,38 @@ export function CrawlerPage() {
   const requestedId = searchParams.get('project')
   const projects = projectsState.projects
   const selected = projects?.find((project) => project.id === requestedId) ?? null
-  const crawlState = useLatestCrawl(selected?.id ?? null)
+  const crawlState = useLatestCrawl(selected?.id ?? null, { light: true })
 
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const [justFinished, setJustFinished] = useState<number | null>(null)
   const [filter, setFilter] = useState<IssueFilter>('all')
+  const [progress, setProgress] = useState<number | null>(null)
+  const [rowLimit, setRowLimit] = useState(ROWS_STEP)
 
   const summary = useMemo(() => summarizeCrawl(crawlState.pages), [crawlState.pages])
   const visiblePages = useMemo(() => filterPages(crawlState.pages, filter), [crawlState.pages, filter])
 
-  async function handleStart() {
+  async function handleStart(resumeCrawlId?: string) {
     if (!selected || running) return
     setRunning(true)
     setRunError(null)
     setJustFinished(null)
-    const result = await startCrawl(selected.id)
+    setProgress(null)
+    const result = await startCrawl(selected.id, {
+      ...(resumeCrawlId ? { crawlId: resumeCrawlId } : {}),
+      onProgress: ({ pagesCrawled }) => setProgress(pagesCrawled),
+    })
     setRunning(false)
+    setProgress(null)
     if (result.data === null) {
       setRunError(result.error)
+      crawlState.reload()
       return
     }
     setJustFinished(result.data.pagesCrawled)
     setFilter('all')
+    setRowLimit(ROWS_STEP)
     crawlState.reload()
   }
 
@@ -180,6 +193,7 @@ export function CrawlerPage() {
               setRunError(null)
               setJustFinished(null)
               setFilter('all')
+              setRowLimit(ROWS_STEP)
               const next = new URLSearchParams(searchParams)
               if (projectId) next.set('project', projectId)
               else next.delete('project')
@@ -192,15 +206,16 @@ export function CrawlerPage() {
           </Button>
         </div>
         <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-600">
-          Crawls up to 25 pages of this one website, follows links on the same site only, and respects robots.txt.
-          A crawl can take up to 90 seconds.
+          Crawls up to {formatPageLimit()} pages of this one website, follows links on the same site only, and
+          respects robots.txt. Small sites take about a minute; large sites can take several minutes.
         </p>
       </Card>
 
       {running ? (
         <Alert variant="info" className="mb-6" title="Crawl in progress">
-          Fetching pages from {selected ? formatUrlForDisplay(selected.website_url, 60) : 'the site'}. Keep this page
-          open until it finishes.
+          Fetching pages from {selected ? formatUrlForDisplay(selected.website_url, 60) : 'the site'}
+          {progress !== null ? ` · ${progress.toLocaleString('en-US')} pages so far` : ''}. Keep this page open until it
+          finishes. Large sites are crawled in parts of about a minute each.
         </Alert>
       ) : null}
       {runError ? (
@@ -264,9 +279,23 @@ export function CrawlerPage() {
               </div>
             ) : crawl.status === 'running' ? (
               <div className="p-5">
-                <Alert variant="info">
-                  This crawl is still marked as running. Reload in a minute; if it never finishes, start a new crawl.
-                </Alert>
+                {running ? (
+                  <Alert variant="info">This crawl is in progress.</Alert>
+                ) : (
+                  <Alert variant="info" title="This crawl did not finish">
+                    {crawl.pages_crawled.toLocaleString('en-US')} pages were saved before it stopped (for example, the
+                    page was closed).{' '}
+                    {crawl.last_activity_at && Date.now() - Date.parse(crawl.last_activity_at) < CRAWL_STALE_AFTER_MS
+                      ? 'It may still be running in another tab. '
+                      : ''}
+                    Resume it to continue where it left off.
+                    <div className="mt-3">
+                      <Button onClick={() => void handleStart(crawl.id)} disabled={running}>
+                        Resume crawl
+                      </Button>
+                    </div>
+                  </Alert>
+                )}
               </div>
             ) : (
               <>
@@ -327,7 +356,10 @@ export function CrawlerPage() {
                       id="page-filter"
                       className={controlClasses(false)}
                       value={filter}
-                      onChange={(event) => setFilter(event.target.value as IssueFilter)}
+                      onChange={(event) => {
+                        setFilter(event.target.value as IssueFilter)
+                        setRowLimit(ROWS_STEP)
+                      }}
                     >
                       {(Object.keys(FILTER_LABELS) as IssueFilter[]).map((value) => (
                         <option key={value} value={value}>
@@ -359,12 +391,22 @@ export function CrawlerPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visiblePages.map((page) => (
+                    {visiblePages.slice(0, rowLimit).map((page) => (
                       <PageRow key={page.id} page={page} startUrl={crawl.start_url} />
                     ))}
                   </tbody>
                 </Table>
               )}
+              {visiblePages.length > rowLimit ? (
+                <div className="flex items-center justify-between gap-4 border-t border-slate-100 px-5 py-3 text-sm">
+                  <span className="text-slate-600">
+                    Showing {rowLimit.toLocaleString('en-US')} of {visiblePages.length.toLocaleString('en-US')} pages
+                  </span>
+                  <Button variant="secondary" onClick={() => setRowLimit((value) => value + ROWS_STEP * 2)}>
+                    Show more
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           ) : null}
 

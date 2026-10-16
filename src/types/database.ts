@@ -55,6 +55,8 @@ export type CrawlRow = {
   started_at: string
   finished_at: string | null
   created_at: string
+  /** Added by migration 20261018000000; updated after every crawl slice. */
+  last_activity_at?: string
 }
 
 export type CrawlPageRow = {

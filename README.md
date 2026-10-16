@@ -18,11 +18,13 @@ Local SEO Workbench is a SaaS workspace for SEO specialists, agencies and local 
 
 ## What Phase 2 adds: Website Crawler
 
-Pick a project, click **Start crawl**, and the app fetches up to 25 pages of that site (same site only, following internal links, honouring `robots.txt`) and shows, per page: HTTP status, title, H1, word count and a list of on-page issues, plus a summary and issue breakdown. Checks: failed or 4xx/5xx pages, missing/short/long/duplicate titles, missing/short/long/duplicate meta descriptions, missing or multiple H1, thin content (under 300 words), `noindex`, missing canonical, slow responses (over 3 s).
+Pick a project, click **Start crawl**, and the app fetches up to 1,000 pages of that site (same site only, following internal links, honouring `robots.txt`) and shows, per page: HTTP status, title, H1, word count and a list of on-page issues, plus a summary and issue breakdown. Checks: failed or 4xx/5xx pages, missing/short/long/duplicate titles, missing/short/long/duplicate meta descriptions, missing or multiple H1, thin content (under 300 words), `noindex`, missing canonical, slow responses (over 3 s).
 
 It works by calling a Supabase **Edge Function** (`supabase/functions/crawl-site`) because browsers cannot fetch other websites. The function verifies the signed-in user and that the project is theirs, crawls, and saves results with the service role (the key never leaves Supabase). Users can read and delete their own crawl data but cannot write it, so results cannot be forged from the browser.
 
-Safety limits: public http(s) addresses only (localhost, private networks and IPv6 literals are refused, redirects are re-checked, DNS answers are checked), 25 pages, 1 MB per page, 8 s per request, 90 s total, one running crawl per project.
+Safety limits: public http(s) addresses only (localhost, private networks and IPv6 literals are refused, redirects are re-checked, DNS answers are checked), 1,000 pages, 1 MB per page, 8 s per request, 5 pages at a time, 20 minutes total, one running crawl per project. The limits live in `supabase/functions/_shared/limits.ts`.
+
+Large crawls run in parts. Supabase stops an Edge Function call after about 150 s (and allows 2 s of CPU per call), so each call crawls at most 80 pages or about a minute, saves those pages plus the list of URLs still to visit (`crawl_state` table, service role only), and the browser calls again until the crawl is done. Duplicate title and description checks run across all pages at the end. If the page is closed part-way, the crawler page offers **Resume crawl**.
 
 ### Set up Phase 2 (two extra steps)
 
@@ -47,7 +49,8 @@ If you see "The crawler service is not available yet", the function is not deplo
 - HTML parsing is lightweight (no browser DOM), so unusual markup can be missed.
 - Not checked yet: broken external links, images, structured data, sitemaps, mobile or speed scores.
 - A DNS-rebinding attacker could in theory change a hostname's address between the safety check and the fetch; the function also validates every redirect and re-checks DNS per request.
-- The crawl runs while the page is open (up to about 90 s); it is not a background job yet.
+- The crawl runs while the page is open (a 1,000-page site can take several minutes); it is not a background job yet. If the page is closed, resume it later.
+- Each crawl stores up to about 12 KB of text per page and each project keeps its 5 newest crawls, so 1,000-page crawls use noticeably more database space (roughly 10–60 MB per project). Watch the 500 MB limit on Supabase's free plan.
 
 ## What Phase 3 adds: Local Page Auditor
 
@@ -65,6 +68,14 @@ The crawler now stores extra signals (structured data, phone numbers, headings, 
 2. **Redeploy the Edge Function** so it collects the new signals: `npx supabase functions deploy crawl-site`
 3. **Crawl each project again.** Crawls made before this version have no local signals; the auditor tells you to crawl again. The function also now keeps only the 5 newest crawls per project.
 4. Open **Local Page Auditor** and choose the project.
+
+### Upgrade: crawls of up to 1,000 pages
+
+1. **Apply the fourth migration** in the Supabase SQL Editor: `supabase/migrations/20261018000000_large_crawls.sql` (after the first three).
+2. **Redeploy the Edge Function:** `npx supabase functions deploy crawl-site`
+3. Push to GitHub so Vercel redeploys the website (the progress and resume screens are in the website).
+
+Do the steps in this order. Without the migration, a new crawl stops with a message asking for it.
 
 ### Auditor limitations
 

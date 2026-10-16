@@ -6,6 +6,7 @@
  * project's own site, honour robots.txt, and bound pages, bytes and time.
  */
 import { analyzePage, findDuplicateIssues, sortIssues, type IssueCode } from './issues.ts'
+import { CRAWL_CONCURRENCY, CRAWL_MAX_PAGES } from './limits.ts'
 import { phoneKey } from './phone.ts'
 
 export { phoneKey }
@@ -23,12 +24,12 @@ export type CrawlLimits = {
 }
 
 export const DEFAULT_LIMITS: CrawlLimits = {
-  maxPages: 25,
+  maxPages: CRAWL_MAX_PAGES,
   maxBytes: 1_000_000,
   fetchTimeoutMs: 8_000,
   totalBudgetMs: 90_000,
   maxRedirects: 3,
-  concurrency: 3,
+  concurrency: CRAWL_CONCURRENCY,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -541,6 +542,34 @@ export type CrawlOptions = {
   limits?: Partial<CrawlLimits>
 }
 
+/**
+ * Everything needed to continue a crawl in a later Edge Function call. Plain JSON so it can be
+ * stored in the database between slices.
+ */
+export type CrawlState = {
+  v: 1
+  /** URLs still to visit, in order, with their link depth. */
+  queue: { u: string; d: number }[]
+  /** Normalised keys of every URL already queued or visited (see normalizeForQueue). */
+  seen: string[]
+  robots: RobotsRules
+  /** Pages handed to the fetcher so far (counts toward maxPages). */
+  scheduled: number
+  skippedByRobots: number
+}
+
+/** Bounds on stored crawl state so a link-heavy site cannot grow it without limit. */
+const MAX_SEEN = 20_000
+const MAX_QUEUE = 5_000
+
+export type CrawlStepResult = {
+  /** Pages fetched in this step (duplicate title/description issues are NOT added here). */
+  pages: CrawledPage[]
+  state: CrawlState
+  /** 'completed' / 'page_limit' finish the crawl; 'slice_end' means call crawlStep again. */
+  outcome: 'completed' | 'page_limit' | 'slice_end'
+}
+
 function truncate(value: string | null, max: number): string | null {
   if (value === null) return null
   return value.length > max ? value.slice(0, max) : value
@@ -567,10 +596,11 @@ async function readTextCapped(response: Response, maxBytes: number): Promise<str
 
 class CrawlFetchError extends Error {}
 
-export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
+type QueueItem = { url: URL; depth: number }
+
+function makeCrawler(options: CrawlOptions) {
   const limits: CrawlLimits = { ...DEFAULT_LIMITS, ...options.limits }
   const now = options.now ?? (() => Date.now())
-  const startedAt = now()
   const start = options.startUrl
 
   /** Fetches with manual redirects so every hop is re-validated; never leaves the site. */
@@ -612,30 +642,6 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
     }
     throw new CrawlFetchError('Too many redirects')
   }
-
-  // robots.txt: unreachable or missing means "no restrictions".
-  let robots: RobotsRules = { allow: [], disallow: [] }
-  try {
-    const robotsUrl = new URL('/robots.txt', start)
-    const { response, leftSite } = await safeFetch(robotsUrl, 'text/plain')
-    if (response.status === 200 && !leftSite) robots = parseRobots(await readTextCapped(response, 200_000))
-    else await response.body?.cancel().catch(() => undefined)
-  } catch {
-    // keep permissive defaults
-  }
-
-  if (!isPathAllowed(robots, start.pathname + start.search)) {
-    return { pages: [], stoppedReason: 'blocked_by_robots', skippedByRobots: 1 }
-  }
-
-  type QueueItem = { url: URL; depth: number }
-  const queue: QueueItem[] = [{ url: start, depth: 0 }]
-  const seen = new Set<string>([normalizeForQueue(start)])
-  const pages: CrawledPage[] = []
-  const analysed: { title: string | null; metaDescription: string | null; index: number }[] = []
-  let scheduled = 0
-  let skippedByRobots = 0
-  let stoppedReason: StopReason = 'completed'
 
   async function crawlOne(item: QueueItem): Promise<{ page: CrawledPage | null; links: URL[] }> {
     const began = now()
@@ -742,18 +748,102 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
     }
   }
 
+  return { limits, now, start, safeFetch, crawlOne }
+}
+
+/**
+ * First step of a crawl: reads robots.txt and returns the initial state, or `null` when robots.txt
+ * blocks the start page.
+ */
+export async function beginCrawl(options: CrawlOptions): Promise<CrawlState | null> {
+  const { start, safeFetch } = makeCrawler(options)
+
+  // robots.txt: unreachable or missing means "no restrictions".
+  let robots: RobotsRules = { allow: [], disallow: [] }
+  try {
+    const robotsUrl = new URL('/robots.txt', start)
+    const { response, leftSite } = await safeFetch(robotsUrl, 'text/plain')
+    if (response.status === 200 && !leftSite) robots = parseRobots(await readTextCapped(response, 200_000))
+    else await response.body?.cancel().catch(() => undefined)
+  } catch {
+    // keep permissive defaults
+  }
+
+  if (!isPathAllowed(robots, start.pathname + start.search)) return null
+  return {
+    v: 1,
+    queue: [{ u: start.href, d: 0 }],
+    seen: [normalizeForQueue(start)],
+    robots,
+    scheduled: 0,
+    skippedByRobots: 0,
+  }
+}
+
+/** Checks that stored state has the expected shape (it round-trips through the database). */
+export function isCrawlState(value: unknown): value is CrawlState {
+  if (typeof value !== 'object' || value === null) return false
+  const state = value as Partial<CrawlState>
+  return (
+    state.v === 1 &&
+    Array.isArray(state.queue) &&
+    Array.isArray(state.seen) &&
+    typeof state.robots === 'object' &&
+    state.robots !== null &&
+    Array.isArray(state.robots.allow) &&
+    Array.isArray(state.robots.disallow) &&
+    typeof state.scheduled === 'number' &&
+    typeof state.skippedByRobots === 'number'
+  )
+}
+
+export type CrawlStepOptions = CrawlOptions & {
+  state: CrawlState
+  /** Absolute time (same clock as `now`) after which no new batch is started. */
+  deadline: number
+  /** Most pages to schedule in this step. */
+  stepMaxPages?: number
+}
+
+/**
+ * Crawls from saved state until the queue is empty, the total page limit is reached, the deadline
+ * passes or `stepMaxPages` pages were scheduled. Returns the new pages and the state to resume from.
+ */
+export async function crawlStep(options: CrawlStepOptions): Promise<CrawlStepResult> {
+  const { limits, now, crawlOne } = makeCrawler(options)
+  const state = options.state
+  const robots = state.robots
+
+  const queue: QueueItem[] = []
+  for (const entry of state.queue) {
+    const url = parseCrawlUrl(entry.u)
+    if (url && isSameSite(options.startUrl, url)) queue.push({ url, depth: Math.max(0, entry.d | 0) })
+  }
+  const seen = new Set<string>(state.seen)
+  const pages: CrawledPage[] = []
+  let scheduled = state.scheduled
+  let skippedByRobots = state.skippedByRobots
+  const stepLimit = options.stepMaxPages ?? Number.POSITIVE_INFINITY
+  let stepScheduled = 0
+  let outcome: CrawlStepResult['outcome'] = 'completed'
+
   while (queue.length > 0) {
     if (scheduled >= limits.maxPages) {
-      stoppedReason = 'page_limit'
+      outcome = 'page_limit'
       break
     }
-    if (now() - startedAt >= limits.totalBudgetMs) {
-      stoppedReason = 'time_limit'
+    if (now() >= options.deadline || stepScheduled >= stepLimit) {
+      outcome = 'slice_end'
       break
     }
 
     const batch: QueueItem[] = []
-    while (queue.length > 0 && batch.length < limits.concurrency && scheduled + batch.length < limits.maxPages) {
+    while (
+      queue.length > 0 &&
+      batch.length < limits.concurrency &&
+      scheduled + batch.length < limits.maxPages &&
+      stepScheduled + batch.length < stepLimit
+    ) {
       const next = queue.shift()
       if (!next) break
       if (!isPathAllowed(robots, next.url.pathname + next.url.search)) {
@@ -763,34 +853,87 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       batch.push(next)
     }
     scheduled += batch.length
+    stepScheduled += batch.length
 
     const results = await Promise.all(batch.map((item) => crawlOne(item)))
     for (const [position, result] of results.entries()) {
       const item = batch[position]
       if (!item || !result.page) continue
       pages.push(result.page)
-      if (result.page.status_code !== null && result.page.status_code < 400 && !result.page.error) {
-        analysed.push({ title: result.page.title, metaDescription: result.page.meta_description, index: pages.length - 1 })
-      }
       for (const link of result.links) {
         if (SKIPPED_EXTENSIONS.test(link.pathname)) continue
         const key = normalizeForQueue(link)
         if (seen.has(key)) continue
+        if (seen.size >= MAX_SEEN || queue.length >= MAX_QUEUE) continue
         seen.add(key)
         queue.push({ url: link, depth: item.depth + 1 })
       }
     }
   }
 
-  const duplicates = findDuplicateIssues(analysed)
-  for (const [position, entry] of analysed.entries()) {
-    const page = pages[entry.index]
-    const extra = duplicates[position]
-    if (page && extra && extra.length > 0) page.issues = [...page.issues, ...extra]
+  return {
+    pages,
+    outcome,
+    state: {
+      v: 1,
+      queue: queue.map((item) => ({ u: item.url.href, d: item.depth })),
+      seen: [...seen],
+      robots,
+      scheduled,
+      skippedByRobots,
+    },
   }
-  for (const page of pages) page.issues = sortIssues(page.issues)
+}
 
-  return { pages, stoppedReason, skippedByRobots }
+type DuplicateCandidate = {
+  title: string | null
+  meta_description: string | null
+  status_code: number | null
+  error: string | null
+  issues: readonly string[]
+}
+
+/**
+ * Adds duplicate title / meta description issues across all pages of a crawl. Returns, per input
+ * index, the new sorted issue list, or null when that page's issues do not change.
+ */
+export function applyDuplicateIssues(pages: readonly DuplicateCandidate[]): (IssueCode[] | null)[] {
+  const analysed: { title: string | null; metaDescription: string | null; index: number }[] = []
+  pages.forEach((page, index) => {
+    if (page.status_code !== null && page.status_code < 400 && !page.error) {
+      analysed.push({ title: page.title, metaDescription: page.meta_description, index })
+    }
+  })
+  const duplicates = findDuplicateIssues(analysed)
+  const out: (IssueCode[] | null)[] = pages.map(() => null)
+  for (const [position, entry] of analysed.entries()) {
+    const extra = duplicates[position]
+    const page = pages[entry.index]
+    if (!page || !extra || extra.length === 0) continue
+    const current = page.issues as IssueCode[]
+    const missing = extra.filter((code) => !current.includes(code))
+    if (missing.length > 0) out[entry.index] = sortIssues([...current, ...missing])
+  }
+  return out
+}
+
+/** Single-call crawl (used by tests and small sites): begin, crawl until done or out of time. */
+export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
+  const limits: CrawlLimits = { ...DEFAULT_LIMITS, ...options.limits }
+  const now = options.now ?? (() => Date.now())
+  const startedAt = now()
+
+  const state = await beginCrawl(options)
+  if (!state) return { pages: [], stoppedReason: 'blocked_by_robots', skippedByRobots: 1 }
+
+  const step = await crawlStep({ ...options, state, deadline: startedAt + limits.totalBudgetMs })
+  const pages = step.pages
+  const updated = applyDuplicateIssues(pages)
+  pages.forEach((page, index) => {
+    page.issues = updated[index] ?? sortIssues(page.issues)
+  })
+  const stoppedReason: StopReason = step.outcome === 'slice_end' ? 'time_limit' : step.outcome
+  return { pages, stoppedReason, skippedByRobots: step.state.skippedByRobots }
 }
 
 function emptyFacts() {

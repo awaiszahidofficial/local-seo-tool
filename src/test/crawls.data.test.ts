@@ -80,6 +80,60 @@ describe('startCrawl', () => {
     invokeMock.mockRejectedValue({ name: 'FunctionsFetchError' })
     expect((await startCrawl(PROJECT_ID)).error).toMatch(/could not reach the server/i)
   })
+
+  it('keeps calling with the crawl id while the server reports the crawl as running', async () => {
+    invokeMock
+      .mockResolvedValueOnce({ data: { crawlId: CRAWL_ID, status: 'running', pagesCrawled: 250 }, error: null })
+      .mockResolvedValueOnce({ data: { crawlId: CRAWL_ID, status: 'running', pagesCrawled: 500 }, error: null })
+      .mockResolvedValueOnce({ data: { crawlId: CRAWL_ID, status: 'completed', pagesCrawled: 640 }, error: null })
+    const progress: number[] = []
+
+    const result = await startCrawl(PROJECT_ID, { onProgress: ({ pagesCrawled }) => progress.push(pagesCrawled) })
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, 'crawl-site', { body: { projectId: PROJECT_ID } })
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'crawl-site', { body: { projectId: PROJECT_ID, crawlId: CRAWL_ID } })
+    expect(invokeMock).toHaveBeenCalledTimes(3)
+    expect(progress).toEqual([250, 500, 640])
+    expect(result).toEqual({ data: { crawlId: CRAWL_ID, pagesCrawled: 640 }, error: null })
+  })
+
+  it('resumes an existing crawl when given its id', async () => {
+    invokeMock.mockResolvedValue({ data: { crawlId: CRAWL_ID, status: 'completed', pagesCrawled: 900 }, error: null })
+    const result = await startCrawl(PROJECT_ID, { crawlId: CRAWL_ID })
+    expect(invokeMock).toHaveBeenCalledWith('crawl-site', { body: { projectId: PROJECT_ID, crawlId: CRAWL_ID } })
+    expect(result.data?.pagesCrawled).toBe(900)
+  })
+
+  it('retries a failed continuation, then reports that progress is saved', async () => {
+    invokeMock
+      .mockResolvedValueOnce({ data: { crawlId: CRAWL_ID, status: 'running', pagesCrawled: 250 }, error: null })
+      .mockResolvedValue({ data: null, error: { name: 'FunctionsFetchError' } })
+
+    const result = await startCrawl(PROJECT_ID)
+
+    expect(invokeMock).toHaveBeenCalledTimes(4) // start + continuation + 2 retries
+    expect(result.data).toBeNull()
+    expect(result.error).toMatch(/could not reach the server.*resume/i)
+  })
+
+  it('recovers when a retried continuation succeeds', async () => {
+    invokeMock
+      .mockResolvedValueOnce({ data: { crawlId: CRAWL_ID, status: 'running', pagesCrawled: 250 }, error: null })
+      .mockResolvedValueOnce({ data: null, error: { name: 'FunctionsFetchError' } })
+      .mockResolvedValueOnce({ data: { crawlId: CRAWL_ID, status: 'completed', pagesCrawled: 300 }, error: null })
+    expect(await startCrawl(PROJECT_ID)).toEqual({ data: { crawlId: CRAWL_ID, pagesCrawled: 300 }, error: null })
+  })
+
+  it('does not retry a failed start (it could create a second crawl)', async () => {
+    invokeMock.mockResolvedValue({ data: null, error: { name: 'FunctionsFetchError' } })
+    await startCrawl(PROJECT_ID)
+    expect(invokeMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a malformed crawl id', async () => {
+    expect((await startCrawl(PROJECT_ID, { crawlId: 'nope' })).data).toBeNull()
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('getLatestCrawl / listCrawlPages', () => {
@@ -112,8 +166,8 @@ describe('getLatestCrawl / listCrawlPages', () => {
   })
 
   it('lists pages ordered by depth then url', async () => {
-    const limit = vi.fn().mockResolvedValue({ data: [{ id: 'p1' }], error: null })
-    const order2 = vi.fn(() => ({ limit }))
+    const range = vi.fn().mockResolvedValue({ data: [{ id: 'p1' }], error: null })
+    const order2 = vi.fn(() => ({ range }))
     const order1 = vi.fn(() => ({ order: order2 }))
     fromMock.mockReturnValue({ select: () => ({ eq: () => ({ order: order1 }) }) })
 
@@ -121,7 +175,28 @@ describe('getLatestCrawl / listCrawlPages', () => {
 
     expect(order1).toHaveBeenCalledWith('depth', { ascending: true })
     expect(order2).toHaveBeenCalledWith('url', { ascending: true })
+    expect(range).toHaveBeenCalledWith(0, 499)
     expect(result.data).toEqual([{ id: 'p1' }])
+  })
+
+  it('loads all pages of a large crawl in batches, up to 1,000', async () => {
+    const batch = (start: number, count: number) =>
+      Array.from({ length: count }, (_, index) => ({ id: `p${start + index}`, body_text: 'text' }))
+    const range = vi
+      .fn()
+      .mockResolvedValueOnce({ data: batch(0, 500), error: null })
+      .mockResolvedValueOnce({ data: batch(500, 500), error: null })
+    const select = vi.fn(() => ({ eq: () => ({ order: () => ({ order: () => ({ range }) }) }) }))
+    fromMock.mockReturnValue({ select })
+
+    const result = await listCrawlPages(CRAWL_ID, { light: true })
+
+    expect(range).toHaveBeenNthCalledWith(1, 0, 499)
+    expect(range).toHaveBeenNthCalledWith(2, 500, 999)
+    expect(range).toHaveBeenCalledTimes(2)
+    expect(result.data).toHaveLength(1000)
+    expect(result.data?.[0]?.body_text).toBeNull()
+    expect(select).toHaveBeenCalledWith(expect.not.stringContaining('body_text'))
   })
 })
 
@@ -167,7 +242,7 @@ describe('summarizeCrawl / filterPages', () => {
 
 describe('describeStopReason', () => {
   it('explains early stops and stays quiet otherwise', () => {
-    expect(describeStopReason('page_limit')).toMatch(/25-page limit/)
+    expect(describeStopReason('page_limit')).toMatch(/1,000-page limit/)
     expect(describeStopReason('time_limit')).toMatch(/ran out of time/)
     expect(describeStopReason('blocked_by_robots')).toMatch(/robots\.txt/)
     expect(describeStopReason('completed')).toBeNull()

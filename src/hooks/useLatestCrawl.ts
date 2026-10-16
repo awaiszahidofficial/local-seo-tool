@@ -9,8 +9,12 @@ type Loaded = {
   error: string | null
 }
 
-/** Loads the latest crawl (and its pages) for a project; `reload` refetches after a new crawl. */
-export function useLatestCrawl(projectId: string | null) {
+/**
+ * Loads the latest crawl (and its pages) for a project; `reload` refetches after a new crawl.
+ * `light` skips the long page text (the crawler table does not show it).
+ */
+export function useLatestCrawl(projectId: string | null, options: { light?: boolean } = {}) {
+  const light = options.light === true
   const [reloadKey, setReloadKey] = useState(0)
   const [result, setResult] = useState<Loaded | null>(null)
   const key = `${projectId ?? ''}:${reloadKey}`
@@ -25,7 +29,7 @@ export function useLatestCrawl(projectId: string | null) {
         setResult({ key, crawl: null, pages: [], error: crawlResult.error })
         return
       }
-      const pagesResult = await listCrawlPages(crawlResult.data.id)
+      const pagesResult = await listCrawlPages(crawlResult.data.id, light ? { light } : undefined)
       if (cancelled) return
       setResult({
         key,
@@ -37,7 +41,7 @@ export function useLatestCrawl(projectId: string | null) {
     return () => {
       cancelled = true
     }
-  }, [projectId, key])
+  }, [projectId, key, light])
 
   const reload = useCallback(() => setReloadKey((value) => value + 1), [])
 
